@@ -1,0 +1,204 @@
+<!--
+  ======================================================
+  views/StudyListView.vue — 検査一覧ページ
+  ======================================================
+  【View（ビュー）コンポーネントの役割】
+  router/index.ts に登録された「ページ」に対応するコンポーネント。
+  以下を担当する:
+    1. Store からデータを取得してページに渡す
+    2. 各 feature コンポーネントを組み合わせてページを構成する
+    3. ページ固有の UI 状態（どの検査が選択されているか等）を管理する
+
+  features/ のコンポーネントはデータの「見た目」を担当するが、
+  View はそれらを「どう配置・連携させるか」を担当する。
+  この分離により features/ のコンポーネントが再利用しやすくなる。
+-->
+
+<template>
+  <div class="page">
+    <!-- ── ヘッダー ───────────────────────────────────── -->
+    <header class="page-header">
+      <div class="logo">
+        <span class="logo-icon">⬡</span>
+        <span class="logo-text">DICOM Tool</span>
+      </div>
+      <div class="header-actions">
+        <button class="refresh-btn" :disabled="store.loading" @click="store.fetchStudies()">
+          <span :class="{ spinning: store.loading }">↻</span>
+          更新
+        </button>
+      </div>
+    </header>
+
+    <!-- ── メインコンテンツ ───────────────────────────── -->
+    <main class="page-main">
+      <div class="toolbar">
+        <h1 class="section-title">検査一覧</h1>
+        <span v-if="store.studies.length > 0" class="study-count">
+          {{ store.studies.length }} 件
+        </span>
+      </div>
+
+      <!--
+        StudyTable は features/study/ のコンポーネント。
+        store から取得したデータを Props として渡す。
+        イベントは View が受け取り、ローカル状態（selectedStudy）を更新する。
+      -->
+      <StudyTable
+        :studies="store.studies"
+        :loading="store.loading"
+        :error="store.error"
+        :selected-u-i-d="selectedStudy?.studyInstanceUID ?? null"
+        @select-study="selectedStudy = $event"
+      />
+    </main>
+
+    <!--
+      モーダルはページ固有の UI なのでここで管理する。
+      selectedStudy が null でなければ SeriesModal を表示する。
+    -->
+    <SeriesModal
+      v-if="selectedStudy"
+      :study="selectedStudy"
+      @close="selectedStudy = null"
+      @open-images="selectedSeries = $event"
+    />
+
+    <ImageViewer
+      v-if="selectedSeries"
+      :series="selectedSeries"
+      @close="selectedSeries = null"
+    />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+
+// Store から取得（@ エイリアスで src/ からの絶対パス）
+import { useDicomStore } from '@/stores/dicomStore'
+
+// feature コンポーネント（それぞれ独立した機能モジュール）
+import StudyTable from '@/features/study/components/StudyTable.vue'
+import SeriesModal from '@/features/series/components/SeriesModal.vue'
+import ImageViewer from '@/features/viewer/components/ImageViewer.vue'
+
+import type { DicomStudy, DicomSeries } from '@/types/dicom'
+
+// ── Store の取得 ──────────────────────────────────────
+// useDicomStore() を呼ぶだけで Store のインスタンスが得られる。
+// Store はシングルトンなので何度呼んでも同じインスタンスが返る。
+const store = useDicomStore()
+
+// ── ページ固有の UI 状態（グローバルでなくていい）──────
+// 選択中の検査・シリーズはこのページだけで使う一時的な状態なので、
+// Store ではなくローカルの ref で管理する。
+const selectedStudy = ref<DicomStudy | null>(null)
+const selectedSeries = ref<DicomSeries | null>(null)
+
+// ── ライフサイクルフック ──────────────────────────────
+// ページが表示されたら自動的に DICOM データを読み込む
+onMounted(() => store.fetchStudies())
+</script>
+
+<style scoped>
+.page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem;
+  height: 52px;
+  background: #111827;
+  border-bottom: 1px solid #1e2535;
+  flex-shrink: 0;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.logo-icon {
+  color: #7eb8f7;
+  font-size: 1.3rem;
+}
+
+.logo-text {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  letter-spacing: 0.03em;
+}
+
+.refresh-btn {
+  background: #1e2d45;
+  color: #7eb8f7;
+  border: 1px solid #2a3f5f;
+  border-radius: 5px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: background 0.15s;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: #243550;
+}
+
+.refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spinning {
+  display: inline-block;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.page-main {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem 0.75rem;
+  border-bottom: 1px solid #1e2535;
+}
+
+.section-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #8b9ab3;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.study-count {
+  font-size: 0.78rem;
+  background: #1e2d45;
+  color: #7eb8f7;
+  border-radius: 10px;
+  padding: 1px 8px;
+}
+</style>

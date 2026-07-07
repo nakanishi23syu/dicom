@@ -1,0 +1,29 @@
+# 依存パッケージ（npm install で再生成できるため不要）
+node_modules/
+
+# ビルド成果物
+dist/
+
+# ローカル環境固有の設定
+.env
+.env.local
+.env.*.local
+
+# エディタ設定
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# OS が自動生成するファイル
+.DS_Store
+Thumbs.db
+
+# ログ
+*.log
+npm-debug.log*
+
+# TypeScript のビルドキャッシュ
+*.tsbuildinfo
