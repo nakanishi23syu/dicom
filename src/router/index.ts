@@ -16,6 +16,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 // これにより初回ロードのバンドルサイズを削減できる。
 // 小規模なうちは効果は薄いが、ページが増えたときに重要になるため最初から使っておく。
 const StudyListView = () => import('@/views/StudyListView.vue')
+const TutorialView = () => import('@/views/TutorialView.vue')
+const SeriesViewerView = () => import('@/views/SeriesViewerView.vue')
 
 // ======================================================
 // ルート定義
@@ -29,6 +31,16 @@ const routes = [
     path: '/',
     name: 'study-list', // ルート名（文字列でなく名前で参照するとリファクタリングに強い）
     component: StudyListView,
+  },
+  {
+    path: '/tutorial',
+    name: 'tutorial', // Vue学習チュートリアルページ
+    component: TutorialView,
+  },
+  {
+    path: '/viewer/:seriesInstanceUID',
+    name: 'series-viewer', // 新しい画像ビューアページ（旧ImageViewer.vueは未使用のまま残置）
+    component: SeriesViewerView,
   },
   // 将来の拡張例:
   // {

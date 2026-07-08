@@ -23,6 +23,7 @@
         <span class="logo-text">DICOM Tool</span>
       </div>
       <div class="header-actions">
+        <RouterLink :to="{ name: 'tutorial' }" class="tutorial-link">📘 Vue学習</RouterLink>
         <button class="refresh-btn" :disabled="store.loading" @click="store.fetchStudies()">
           <span :class="{ spinning: store.loading }">↻</span>
           更新
@@ -61,19 +62,14 @@
       v-if="selectedStudy"
       :study="selectedStudy"
       @close="selectedStudy = null"
-      @open-images="selectedSeries = $event"
-    />
-
-    <ImageViewer
-      v-if="selectedSeries"
-      :series="selectedSeries"
-      @close="selectedSeries = null"
+      @open-images="openSeries"
     />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 
 // Store から取得（@ エイリアスで src/ からの絶対パス）
 import { useDicomStore } from '@/stores/dicomStore'
@@ -81,9 +77,12 @@ import { useDicomStore } from '@/stores/dicomStore'
 // feature コンポーネント（それぞれ独立した機能モジュール）
 import StudyTable from '@/features/study/components/StudyTable.vue'
 import SeriesModal from '@/features/series/components/SeriesModal.vue'
-import ImageViewer from '@/features/viewer/components/ImageViewer.vue'
+// 旧 features/viewer/components/ImageViewer.vue はファイルとして残しているが、
+// 新しい画像ビューア（/viewer/:seriesInstanceUID ページ）に役目を譲ったためここでは参照しない。
 
 import type { DicomStudy, DicomSeries } from '@/types/dicom'
+
+const router = useRouter()
 
 // ── Store の取得 ──────────────────────────────────────
 // useDicomStore() を呼ぶだけで Store のインスタンスが得られる。
@@ -91,10 +90,14 @@ import type { DicomStudy, DicomSeries } from '@/types/dicom'
 const store = useDicomStore()
 
 // ── ページ固有の UI 状態（グローバルでなくていい）──────
-// 選択中の検査・シリーズはこのページだけで使う一時的な状態なので、
+// 選択中の検査はこのページだけで使う一時的な状態なので、
 // Store ではなくローカルの ref で管理する。
 const selectedStudy = ref<DicomStudy | null>(null)
-const selectedSeries = ref<DicomSeries | null>(null)
+
+// シリーズがダブルクリックされたら、モーダルではなく専用ページへ遷移する。
+function openSeries(series: DicomSeries) {
+  router.push({ name: 'series-viewer', params: { seriesInstanceUID: series.seriesInstanceUID } })
+}
 
 // ── ライフサイクルフック ──────────────────────────────
 // ページが表示されたら自動的に DICOM データを読み込む
@@ -135,6 +138,23 @@ onMounted(() => store.fetchStudies())
   font-weight: 600;
   color: #e2e8f0;
   letter-spacing: 0.03em;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tutorial-link {
+  font-size: 0.85rem;
+  color: #7eb8f7;
+  text-decoration: none;
+  padding: 0.35rem 0.6rem;
+}
+
+.tutorial-link:hover {
+  text-decoration: underline;
 }
 
 .refresh-btn {

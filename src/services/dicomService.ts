@@ -50,11 +50,25 @@ export async function parseDicomFile(filePath: string) {
 export async function renderDicomToCanvas(
   filePath: string,
   canvas: HTMLCanvasElement,
-  scale = 1,
+  scale = 1
 ): Promise<void> {
   const image = await parseDicomFile(filePath)
   if (!image) throw new Error('DICOMファイルのパースに失敗しました')
   await dicomts.render(image, canvas, scale)
+}
+
+// ======================================================
+// firstTagValue — getTagValue() の戻り値を単一の値に正規化する
+// ======================================================
+// dicom.ts の getTagValue() は、UI（Unique Identifier）等のVRを持つタグを
+// 値1個であっても配列（例: ["1.2.3..."]）で返すことがある。
+// 配列のまま Map のキーや === 比較に使うと、内容が同じでも
+// 呼び出しごとに別インスタンスの配列になるため一致判定できなくなる
+// （実際にこれが原因で Study のグルーピングが機能しない不具合があった）。
+// そのため、配列で返ってきた場合は最初の要素だけを取り出して使う。
+function firstTagValue(image: ReturnType<typeof dicomts.parseImage>, tag: [number, number]) {
+  const value = image?.getTagValue(tag)
+  return Array.isArray(value) ? value[0] : value
 }
 
 // ======================================================
@@ -80,12 +94,13 @@ export async function loadAllStudies(): Promise<DicomStudy[]> {
     // ── DICOM タグの読み取り ──────────────────────────────────
     // タグは [グループ番号, 要素番号] の16進数ペア。
     // dicom.ts の getTagValue() でタグの値を取得する（型は any なので as でキャスト）。
+    // UID系のタグは配列で返ってくることがあるため firstTagValue() で正規化する。
 
-    const studyUID = (image.getTagValue([0x0020, 0x000d]) as string) ?? fileName // (0020,000D) Study Instance UID
-    const studyDesc = (image.getTagValue([0x0008, 0x1030]) as string) ?? '' // (0008,1030) Study Description
-    const accessionNum = (image.getTagValue([0x0008, 0x0050]) as string) ?? '' // (0008,0050) Accession Number
-    const sopUID = (image.getTagValue([0x0008, 0x0018]) as string) ?? '' // (0008,0018) SOP Instance UID
-    const instanceNum = (image.getTagValue([0x0020, 0x0013]) as string | number) ?? '' // (0020,0013) Instance Number
+    const studyUID = (firstTagValue(image, [0x0020, 0x000d]) as string) ?? fileName // (0020,000D) Study Instance UID
+    const studyDesc = (firstTagValue(image, [0x0008, 0x1030]) as string) ?? '' // (0008,1030) Study Description
+    const accessionNum = (firstTagValue(image, [0x0008, 0x0050]) as string) ?? '' // (0008,0050) Accession Number
+    const sopUID = (firstTagValue(image, [0x0008, 0x0018]) as string) ?? '' // (0008,0018) SOP Instance UID
+    const instanceNum = (firstTagValue(image, [0x0020, 0x0013]) as string | number) ?? '' // (0020,0013) Instance Number
     const seriesUID = image.seriesInstanceUID ?? ''
 
     // ── Study の登録（初出の UID なら新規作成）──────────────────
@@ -107,7 +122,7 @@ export async function loadAllStudies(): Promise<DicomStudy[]> {
 
     // ── Series の登録（同じ seriesUID がなければ新規作成）──────────
     let series: DicomSeries | undefined = study.series.find(
-      (s) => s.seriesInstanceUID === seriesUID,
+      (s) => s.seriesInstanceUID === seriesUID
     )
     if (!series) {
       series = {

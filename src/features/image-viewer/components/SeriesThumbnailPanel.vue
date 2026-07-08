@@ -1,0 +1,194 @@
+<!--
+  ======================================================
+  SeriesThumbnailPanel.vue — サムネイル一覧（左側パネル）
+  ======================================================
+  シリーズに含まれる画像を小さいcanvasの一覧として表示する。
+  選択中のインデックスはPropsで受け取り、クリックされたら
+  自分では状態を変えず 'select' イベントで親に伝える（単方向データフロー）。
+
+  【WebGLコンテキストの節約について】
+  dicom.ts の render() はcanvasごとにWebGLコンテキストを1つ消費する。
+  ブラウザはページ全体で同時に持てるWebGLコンテキスト数に上限があり
+  （Chromeでは実用上16個程度）、シリーズの枚数が多いと
+  「Too many active WebGL contexts. Oldest context will be lost.」という
+  警告とともに古いサムネイルの描画が失われる不具合が起きる。
+  そのため、実際にWebGLで描画するcanvasは非表示の共有canvas1枚だけにし、
+  各サムネイルはその描画結果を2D canvas（drawImage）でコピーするだけにする。
+  こうすることで、サムネイルが何百枚あってもWebGLコンテキストは1つで済む。
+-->
+
+<template>
+  <aside class="thumb-panel">
+    <p class="thumb-panel-title">{{ instances.length }} 枚</p>
+
+    <!--
+      描画専用の共有canvas。画面には表示しないが、DOMからは取り除かない
+      （visibility:hidden ならレイアウトから消えるだけでWebGLコンテキストは維持される）。
+    -->
+    <canvas ref="sharedRenderCanvas" class="shared-render-canvas" />
+
+    <div class="thumb-list">
+      <button
+        v-for="(instance, idx) in instances"
+        :key="instance.sopInstanceUID || idx"
+        type="button"
+        class="thumb-item"
+        :class="{ active: idx === selectedIndex }"
+        @click="$emit('select', idx)"
+      >
+        <div class="thumb-canvas-wrap">
+          <!--
+            :ref に関数を渡す形式。
+            v-for内で複数生成されるcanvasはそれぞれ別のDOM要素になるため、
+            「マウントされた瞬間にそのcanvasへ描画する」処理をここで行う。
+            ここに渡すcanvasは2D描画専用（WebGLコンテキストは作らない）。
+          -->
+          <canvas
+            :ref="(el) => enqueueThumbnail(el as HTMLCanvasElement | null, instance.filePath)"
+          />
+          <div v-if="thumbErrors[instance.filePath]" class="thumb-error">✕</div>
+        </div>
+        <span class="thumb-label">#{{ instance.instanceNumber || idx + 1 }}</span>
+      </button>
+    </div>
+  </aside>
+</template>
+
+<script setup lang="ts">
+import { ref, reactive } from 'vue'
+import { renderDicomToCanvas } from '@/services/dicomService'
+import type { DicomInstance } from '@/types/dicom'
+
+defineProps<{
+  instances: DicomInstance[]
+  selectedIndex: number
+}>()
+
+defineEmits<{
+  select: [index: number]
+}>()
+
+// ======================================================
+// サムネイルの描画
+// ======================================================
+const thumbErrors = reactive<Record<string, boolean>>({})
+
+// WebGL描画を行う唯一の共有canvas。
+const sharedRenderCanvas = ref<HTMLCanvasElement | null>(null)
+
+// v-forの各canvasは:refのコールバックでほぼ同時にマウントされるため、
+// 何も対策しないと共有canvasへの描画が並行して走り、互いの描画結果を
+// 上書きしてしまう。Promiseチェーンで「前の描画が終わってから次を描画する」
+// という直列実行のキューを作ることで、共有canvasを安全に使い回す。
+let renderQueue: Promise<void> = Promise.resolve()
+
+function enqueueThumbnail(canvas: HTMLCanvasElement | null, filePath: string) {
+  if (!canvas) return
+  renderQueue = renderQueue.then(() => renderThumbnail(canvas, filePath))
+}
+
+async function renderThumbnail(canvas: HTMLCanvasElement, filePath: string) {
+  const shared = sharedRenderCanvas.value
+  if (!shared) return
+
+  try {
+    // ① 共有canvasにWebGLで描画する（ここでだけWebGLコンテキストを使う）
+    await renderDicomToCanvas(filePath, shared)
+
+    // ② 共有canvasの描画結果を、このサムネイル専用の2D canvasへコピーする
+    canvas.width = shared.width
+    canvas.height = shared.height
+    canvas.getContext('2d')?.drawImage(shared, 0, 0)
+  } catch {
+    thumbErrors[filePath] = true
+  }
+}
+</script>
+
+<style scoped>
+.thumb-panel {
+  width: 220px;
+  flex-shrink: 0;
+  border-right: 1px solid #1e2535;
+  background: #0d1117;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.thumb-panel-title {
+  padding: 0.75rem 1rem 0.5rem;
+  font-size: 0.75rem;
+  color: #8b9ab3;
+  flex-shrink: 0;
+}
+
+/* 描画専用の共有canvas。レイアウトからは消すが、WebGLコンテキストは維持したいのでvisibility:hiddenを使う */
+.shared-render-canvas {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.thumb-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 0.75rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.thumb-item {
+  background: #111827;
+  border: 1px solid #1e2535;
+  border-radius: 6px;
+  padding: 0.4rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.thumb-item:hover {
+  border-color: #3b6ea8;
+  background: #1e2e44;
+}
+
+.thumb-item.active {
+  border-color: #7eb8f7;
+  background: #1a3a5c;
+}
+
+.thumb-canvas-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+.thumb-canvas-wrap canvas {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.thumb-error {
+  position: absolute;
+  color: #f87171;
+  font-size: 0.7rem;
+}
+
+.thumb-label {
+  font-size: 0.7rem;
+  color: #8b9ab3;
+}
+</style>

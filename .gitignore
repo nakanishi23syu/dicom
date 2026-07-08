@@ -16,6 +16,12 @@ dist/
 *.ntvs*
 *.njsproj
 *.sln
+# graphql/ の学習用C#プロジェクトはslnをコミット対象にするため除外を打ち消す
+!graphql/**/*.sln
+
+# .NET（graphql/ 配下の学習用C#プロジェクトのビルド成果物）
+graphql/**/bin/
+graphql/**/obj/
 
 # OS が自動生成するファイル
 .DS_Store

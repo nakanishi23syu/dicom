@@ -1,0 +1,196 @@
+<!--
+  ======================================================
+  views/TutorialView.vue — Vue学習チュートリアルページ
+  ======================================================
+  features/tutorial/components/ にある単元別コンポーネントを
+  サイドバーで切り替えながら表示するページ。
+
+  【このViewの役割】
+  各単元コンポーネント自体には「どの単元を表示するか」の判断ロジックは持たせず、
+  ここ（View）が「単元の一覧管理」と「選択状態の管理」を担当する。
+  単元コンポーネントを追加したくなったら、下の units 配列に1行追加するだけでよい。
+-->
+
+<template>
+  <div class="page">
+    <header class="page-header">
+      <RouterLink :to="{ name: 'study-list' }" class="back-link">← 検査一覧に戻る</RouterLink>
+      <h1>Vue 学習チュートリアル</h1>
+      <p class="page-desc">
+        単元ごとに、実際に動くサンプルコードと解説コメントでVue 3の基本を学べます。
+        React経験者向けの比較解説つき。
+      </p>
+    </header>
+
+    <div class="page-body">
+      <!-- ── サイドバー: 単元一覧 ─────────────────────────── -->
+      <nav class="sidebar">
+        <button
+          v-for="(unit, index) in units"
+          :key="unit.id"
+          class="unit-nav-item"
+          :class="{ active: currentUnitId === unit.id }"
+          @click="currentUnitId = unit.id"
+        >
+          <span class="unit-index">{{ index + 1 }}</span>
+          <span>{{ unit.label }}</span>
+        </button>
+      </nav>
+
+      <!-- ── メイン: 選択中の単元コンポーネントを表示 ───────── -->
+      <main class="unit-content">
+        <!--
+          <component :is="..."> は「表示するコンポーネントを動的に切り替える」組み込みタグ。
+          v-if を単元の数だけ並べるより、1箇所に集約できてシンプルになる。
+        -->
+        <component :is="currentUnit.component" />
+      </main>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, type Component } from 'vue'
+
+import ReactivityUnit from '@/features/tutorial/components/ReactivityUnit.vue'
+import DirectivesUnit from '@/features/tutorial/components/DirectivesUnit.vue'
+import PropsEmitsUnit from '@/features/tutorial/components/PropsEmitsUnit.vue'
+import LifecycleWatchUnit from '@/features/tutorial/components/LifecycleWatchUnit.vue'
+import ComposablesUnit from '@/features/tutorial/components/ComposablesUnit.vue'
+import SlotsUnit from '@/features/tutorial/components/SlotsUnit.vue'
+import PiniaStoreUnit from '@/features/tutorial/components/PiniaStoreUnit.vue'
+
+// ======================================================
+// units — 単元の一覧データ
+// ======================================================
+// id    : サイドバーの選択状態を管理するためのキー
+// label : サイドバーに表示する名前
+// component : <component :is> に渡す実体（インポートしたコンポーネント）
+interface TutorialUnit {
+  id: string
+  label: string
+  component: Component
+}
+
+const units: TutorialUnit[] = [
+  { id: 'reactivity', label: 'テンプレート構文とリアクティビティ', component: ReactivityUnit },
+  { id: 'directives', label: '条件分岐とリスト表示', component: DirectivesUnit },
+  { id: 'props-emits', label: 'Props & Emits', component: PropsEmitsUnit },
+  { id: 'lifecycle-watch', label: 'ライフサイクルとWatch', component: LifecycleWatchUnit },
+  { id: 'composables', label: 'Composable（ロジックの再利用）', component: ComposablesUnit },
+  { id: 'slots', label: 'Slots（コンテンツの差し込み）', component: SlotsUnit },
+  { id: 'pinia-store', label: 'Pinia Store（グローバル状態）', component: PiniaStoreUnit },
+]
+
+// 現在選択中の単元ID。最初は先頭の単元を表示する。
+const currentUnitId = ref(units[0].id)
+
+// currentUnitId に対応する単元データを探すcomputed。
+// 万が一見つからない場合に備え、先頭の単元をフォールバックにする。
+const currentUnit = computed(() => units.find((u) => u.id === currentUnitId.value) ?? units[0])
+</script>
+
+<style scoped>
+.page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.page-header {
+  padding: 1.25rem 1.5rem 1rem;
+  border-bottom: 1px solid #1e2535;
+  background: #111827;
+  flex-shrink: 0;
+}
+
+.back-link {
+  display: inline-block;
+  font-size: 0.8rem;
+  color: #7eb8f7;
+  text-decoration: none;
+  margin-bottom: 0.5rem;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #e2e8f0;
+}
+
+.page-desc {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: #8b9ab3;
+}
+
+.page-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  border-right: 1px solid #1e2535;
+  background: #0d1117;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  overflow-y: auto;
+}
+
+.unit-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+  color: #8b9ab3;
+  font-size: 0.83rem;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.unit-nav-item:hover {
+  background: #1a2133;
+  color: #c8d6e5;
+}
+
+.unit-nav-item.active {
+  background: #1a3a5c;
+  border-color: #2a3f5f;
+  color: #7eb8f7;
+}
+
+.unit-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: #1e2d45;
+  color: #7eb8f7;
+  font-size: 0.7rem;
+  flex-shrink: 0;
+}
+
+.unit-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem 2rem;
+}
+</style>
