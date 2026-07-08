@@ -23,18 +23,21 @@
     </header>
 
     <div class="page-body">
-      <!-- ── サイドバー: 単元一覧 ─────────────────────────── -->
+      <!-- ── サイドバー: 単元一覧（グループごとに見出しを挟む） ── -->
       <nav class="sidebar">
-        <button
-          v-for="(unit, index) in units"
-          :key="unit.id"
-          class="unit-nav-item"
-          :class="{ active: currentUnitId === unit.id }"
-          @click="currentUnitId = unit.id"
-        >
-          <span class="unit-index">{{ index + 1 }}</span>
-          <span>{{ unit.label }}</span>
-        </button>
+        <template v-for="group in groupedUnits" :key="group.name">
+          <p class="group-heading">{{ group.name }}</p>
+          <button
+            v-for="unit in group.units"
+            :key="unit.id"
+            class="unit-nav-item"
+            :class="{ active: currentUnitId === unit.id }"
+            @click="currentUnitId = unit.id"
+          >
+            <span class="unit-index">{{ unit.number }}</span>
+            <span>{{ unit.label }}</span>
+          </button>
+        </template>
       </nav>
 
       <!-- ── メイン: 選択中の単元コンポーネントを表示 ───────── -->
@@ -59,27 +62,84 @@ import LifecycleWatchUnit from '@/features/tutorial/components/LifecycleWatchUni
 import ComposablesUnit from '@/features/tutorial/components/ComposablesUnit.vue'
 import SlotsUnit from '@/features/tutorial/components/SlotsUnit.vue'
 import PiniaStoreUnit from '@/features/tutorial/components/PiniaStoreUnit.vue'
+import RenderingInternalsUnit from '@/features/tutorial/components/RenderingInternalsUnit.vue'
+import ReactivityInternalsUnit from '@/features/tutorial/components/ReactivityInternalsUnit.vue'
+import SchedulerUpdateTimingUnit from '@/features/tutorial/components/SchedulerUpdateTimingUnit.vue'
+import KeyDiffAlgorithmUnit from '@/features/tutorial/components/KeyDiffAlgorithmUnit.vue'
+import CustomDirectivesUnit from '@/features/tutorial/components/CustomDirectivesUnit.vue'
 
 // ======================================================
 // units — 単元の一覧データ
 // ======================================================
 // id    : サイドバーの選択状態を管理するためのキー
 // label : サイドバーに表示する名前
+// group : サイドバーの見出し（基礎編 / 応用・内部実装編）
 // component : <component :is> に渡す実体（インポートしたコンポーネント）
 interface TutorialUnit {
   id: string
   label: string
+  group: string
   component: Component
 }
 
 const units: TutorialUnit[] = [
-  { id: 'reactivity', label: 'テンプレート構文とリアクティビティ', component: ReactivityUnit },
-  { id: 'directives', label: '条件分岐とリスト表示', component: DirectivesUnit },
-  { id: 'props-emits', label: 'Props & Emits', component: PropsEmitsUnit },
-  { id: 'lifecycle-watch', label: 'ライフサイクルとWatch', component: LifecycleWatchUnit },
-  { id: 'composables', label: 'Composable（ロジックの再利用）', component: ComposablesUnit },
-  { id: 'slots', label: 'Slots（コンテンツの差し込み）', component: SlotsUnit },
-  { id: 'pinia-store', label: 'Pinia Store（グローバル状態）', component: PiniaStoreUnit },
+  {
+    id: 'reactivity',
+    label: 'テンプレート構文とリアクティビティ',
+    group: '基礎編',
+    component: ReactivityUnit,
+  },
+  { id: 'directives', label: '条件分岐とリスト表示', group: '基礎編', component: DirectivesUnit },
+  { id: 'props-emits', label: 'Props & Emits', group: '基礎編', component: PropsEmitsUnit },
+  {
+    id: 'lifecycle-watch',
+    label: 'ライフサイクルとWatch',
+    group: '基礎編',
+    component: LifecycleWatchUnit,
+  },
+  {
+    id: 'composables',
+    label: 'Composable（ロジックの再利用）',
+    group: '基礎編',
+    component: ComposablesUnit,
+  },
+  { id: 'slots', label: 'Slots（コンテンツの差し込み）', group: '基礎編', component: SlotsUnit },
+  {
+    id: 'pinia-store',
+    label: 'Pinia Store（グローバル状態）',
+    group: '基礎編',
+    component: PiniaStoreUnit,
+  },
+  {
+    id: 'rendering-internals',
+    label: '仮想DOMとレンダリングの仕組み',
+    group: '応用・内部実装編',
+    component: RenderingInternalsUnit,
+  },
+  {
+    id: 'reactivity-internals',
+    label: 'リアクティビティシステムの内部',
+    group: '応用・内部実装編',
+    component: ReactivityInternalsUnit,
+  },
+  {
+    id: 'scheduler-update-timing',
+    label: '更新タイミングとスケジューラ',
+    group: '応用・内部実装編',
+    component: SchedulerUpdateTimingUnit,
+  },
+  {
+    id: 'key-diff-algorithm',
+    label: 'keyと差分アルゴリズム',
+    group: '応用・内部実装編',
+    component: KeyDiffAlgorithmUnit,
+  },
+  {
+    id: 'custom-directives',
+    label: 'v-memo・カスタムディレクティブ・KeepAlive',
+    group: '応用・内部実装編',
+    component: CustomDirectivesUnit,
+  },
 ]
 
 // 現在選択中の単元ID。最初は先頭の単元を表示する。
@@ -88,6 +148,24 @@ const currentUnitId = ref(units[0].id)
 // currentUnitId に対応する単元データを探すcomputed。
 // 万が一見つからない場合に備え、先頭の単元をフォールバックにする。
 const currentUnit = computed(() => units.find((u) => u.id === currentUnitId.value) ?? units[0])
+
+// ======================================================
+// groupedUnits — サイドバー表示用に units を group ごとにまとめたcomputed
+// ======================================================
+// 通し番号（number）は全体を通じて連番になるようにする
+// （「基礎編7つ→応用編1,2...」ではなく「1〜9」と数字が連続する方が進捗感がわかりやすい）。
+const groupedUnits = computed(() => {
+  const groups: { name: string; units: (TutorialUnit & { number: number })[] }[] = []
+  units.forEach((unit, index) => {
+    let group = groups.find((g) => g.name === unit.group)
+    if (!group) {
+      group = { name: unit.group, units: [] }
+      groups.push(group)
+    }
+    group.units.push({ ...unit, number: index + 1 })
+  })
+  return groups
+})
 </script>
 
 <style scoped>
@@ -145,6 +223,18 @@ const currentUnit = computed(() => units.find((u) => u.id === currentUnitId.valu
   flex-direction: column;
   gap: 0.35rem;
   overflow-y: auto;
+}
+
+.group-heading {
+  padding: 0.6rem 0.75rem 0.2rem;
+  font-size: 0.68rem;
+  color: #4a5a70;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.group-heading:first-child {
+  padding-top: 0.1rem;
 }
 
 .unit-nav-item {
