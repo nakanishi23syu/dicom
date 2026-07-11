@@ -11,6 +11,19 @@ using Microsoft.IdentityModel.Tokens;
 var builder = WebApplication.CreateBuilder(args);
 
 // ======================================================
+// リクエストサイズ上限の緩和（DICOMアップロード対応）
+// ======================================================
+// KestrelはデフォルトでHTTPリクエストボディを30MBまでしか受け付けない。
+// DICOM検査は1検査でも数十〜数百MBになることが珍しくなく
+// （CTの1シリーズだけで数百枚のスライスがあるため）、複数ファイルをまとめて
+// POSTする /api/dicom-upload では既定値だと簡単に超えてしまう。
+// 学習用ツールとしての現実的な上限として500MBまで許容する。
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 500 * 1024 * 1024;
+});
+
+// ======================================================
 // DIコンテナへの登録
 // ======================================================
 // DicomDbContext は SQLite（appsettings.json の ConnectionStrings:Dicom）に永続化するDbContext。
