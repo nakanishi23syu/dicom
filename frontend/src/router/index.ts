@@ -20,6 +20,7 @@ const TutorialView = () => import('@/views/TutorialView.vue')
 const SeriesViewerView = () => import('@/views/SeriesViewerView.vue')
 const UploadView = () => import('@/views/UploadView.vue')
 const LoginView = () => import('@/views/LoginView.vue')
+const TimelineView = () => import('@/views/TimelineView.vue')
 
 // ======================================================
 // ルート定義
@@ -53,6 +54,11 @@ const routes = [
     path: '/login',
     name: 'login', // ログインページ（JWT取得。stores/authStore.ts参照）
     component: LoginView,
+  },
+  {
+    path: '/timeline/:patientId',
+    name: 'timeline', // 患者タイムラインビュー（比較読影支援。backendのpatientTimelineクエリを使用）
+    component: TimelineView,
   },
   // 将来の拡張例:
   // {

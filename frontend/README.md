@@ -15,6 +15,8 @@ Vue 3 + TypeScript 製の DICOM ビューアです。
   DICOMファイルをbackendへ送信。解析・保存はすべてbackend側で行う（下記参照）
 - **ログイン**（`/login`） — JWT認証。ログイン状態はヘッダーに表示され、管理者アカウントのみ
   並べ替え保存等の操作が可能になる（下記参照）
+- **患者タイムライン**（`/timeline/:patientId`） — 検査一覧の「🕐 比較読影」リンクから、
+  同一患者の過去検査を時系列で確認できる（下記参照）
 
 ## 技術スタック
 
@@ -222,6 +224,17 @@ backendの `login` ミューテーションでJWTを取得し、`authStore`（Pi
 > 実装時のハマりどころ: `components/common/BaseButton.vue` は既定で `type="button"` を
 > 強制しており、`<form>` 内で送信ボタンとして使うと `@submit` が発火しなかった。
 > `type` propを追加し、ログインフォームでは明示的に `type="submit"` を渡すよう修正した。
+
+## 患者タイムライン（`/timeline/:patientId`, `src/views/TimelineView.vue`）
+
+関連用語集.md にある「タイムラインビュー」「比較読影」の実装。検査一覧の各行にある
+「🕐 比較読影」リンクから、その患者の過去検査をbackendの `patientTimeline` クエリで取得し、
+新しい順に並べて表示する。隣り合う検査を見比べられるよう、カードの間に比較読影の注記を挟んでいる。
+
+検査一覧（`StudyTable.vue`）は `public/dicom/manifest.json` を直接パースした表示データ、
+タイムラインはbackend DBのデータという別経路のため、**まだbackendにアップロードしていない患者は
+タイムラインが空になる**（アップロードすると同じ患者IDでbackendに登録されるため、そこで初めて繋がる）。
+空の場合は `/upload` へのリンク付きで案内する。
 
 ## ビルド
 

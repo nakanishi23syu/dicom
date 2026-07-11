@@ -190,3 +190,44 @@ export async function reorderSops(orderedSopInstanceUids: string[]): Promise<num
   })
   return data.reorderSops
 }
+
+// ======================================================
+// fetchPatientTimeline — 患者ごとの検査履歴を新しい順に取得する
+// ======================================================
+// 関連用語集.md にある「タイムラインビュー」（同一患者の過去検査を時系列で並べる、
+// 比較読影の土台になる機能）に対応するクエリ。backend側は既に実装済み（Query.cs）。
+export async function fetchPatientTimeline(patientId: string): Promise<GraphQLStudy[]> {
+  const query = `
+    query PatientTimeline($patientId: String!) {
+      patientTimeline(patientId: $patientId) {
+        studyInstanceUid
+        patientName
+        patientId
+        studyDate
+        studyDescription
+        modality
+        accessionNumber
+        bodyPartExamined
+        order
+        series {
+          seriesInstanceUid
+          seriesNumber
+          seriesDescription
+          modality
+          order
+          sops {
+            sopInstanceUid
+            instanceNumber
+            filePath
+            isRead
+            readAt
+            readByUserId
+            order
+          }
+        }
+      }
+    }
+  `
+  const data = await graphqlRequest<{ patientTimeline: GraphQLStudy[] }>(query, { patientId })
+  return data.patientTimeline
+}

@@ -112,6 +112,7 @@
           <th>モダリティ</th>
           <th>アクセッション番号</th>
           <th>シリーズ数</th>
+          <th>タイムライン</th>
         </tr>
       </thead>
       <tbody>
@@ -158,6 +159,21 @@
           </td>
           <td>{{ study.accessionNumber || '—' }}</td>
           <td>{{ study.series.length }}</td>
+          <td>
+            <!--
+              @click.stop: 行全体の@click（select-study）へのバブリング（伝播）を止める。
+              これが無いと、リンクをクリックしたときに行選択も同時に発火してしまう。
+            -->
+            <RouterLink
+              v-if="study.patientID"
+              :to="{ name: 'timeline', params: { patientId: study.patientID } }"
+              class="timeline-link"
+              @click.stop
+            >
+              🕐 比較読影
+            </RouterLink>
+            <span v-else class="timeline-link disabled">—</span>
+          </td>
         </tr>
       </tbody>
     </table>
@@ -418,6 +434,22 @@ const showSortPanel = ref(false)
   padding: 1px 6px;
   font-size: 0.75rem;
   font-weight: 600;
+}
+
+.timeline-link {
+  font-size: 0.78rem;
+  color: var(--color-accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.timeline-link:hover {
+  text-decoration: underline;
+}
+
+.timeline-link.disabled {
+  color: var(--color-text-faint);
+  cursor: default;
 }
 
 .state-msg {
