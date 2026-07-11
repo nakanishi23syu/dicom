@@ -7,4 +7,5 @@
 
 // バックエンド（backend/DicomLearning.GraphQL）のGraphQLエンドポイント。
 // .env.development に開発時の既定値を用意しているが、念のためコード側にもフォールバックを持たせる。
-export const GRAPHQL_ENDPOINT = import.meta.env.VITE_GRAPHQL_ENDPOINT || 'http://localhost:5030/graphql'
+export const GRAPHQL_ENDPOINT =
+  import.meta.env.VITE_GRAPHQL_ENDPOINT || 'http://localhost:5030/graphql'

@@ -17,7 +17,12 @@
 -->
 
 <template>
-  <BaseModal :model-value="modelValue" :title="title" @update:model-value="$emit('update:modelValue', $event)" @close="$emit('close')">
+  <BaseModal
+    :model-value="modelValue"
+    :title="title"
+    @update:model-value="$emit('update:modelValue', $event)"
+    @close="$emit('close')"
+  >
     <!-- 本文はデフォルトスロットで外から渡してもらう -->
     <slot />
 

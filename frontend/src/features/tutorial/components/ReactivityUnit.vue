@@ -170,7 +170,12 @@ const reversedName = computed(() => name.value.split('').reverse().join(''))
 // count の符号によって文字色を変える。
 // v-bind は :属性名="式" の形で、式の結果を属性値として渡す。
 const countStyle = computed(() => ({
-  color: count.value > 0 ? 'var(--color-success)' : count.value < 0 ? 'var(--color-danger)' : 'var(--color-text)',
+  color:
+    count.value > 0
+      ? 'var(--color-success)'
+      : count.value < 0
+        ? 'var(--color-danger)'
+        : 'var(--color-text)',
 }))
 </script>
 

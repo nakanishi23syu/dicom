@@ -22,7 +22,9 @@
         <code>cd backend/DicomLearning.GraphQL && dotnet run</code>
         を実行してバックエンドを起動しておくこと。エンドポイントは
         <code>{{ endpoint }}</code>
-        （<code>frontend/.env.development</code> の
+        （
+        <code>frontend/.env.development</code>
+        の
         <code>VITE_GRAPHQL_ENDPOINT</code>
         で変更可能）。
       </p>
