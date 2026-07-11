@@ -49,21 +49,21 @@ const model = defineModel<string>({ default: '' })
   flex: 1;
   padding: 0.5rem 0.75rem;
   border-radius: 6px;
-  border: 1px solid #2a3f5f;
-  background: #0d1117;
-  color: #c8d6e5;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-bg);
+  color: var(--color-text);
   font-size: 0.9rem;
 }
 
 .custom-input input:focus {
   outline: none;
-  border-color: #7eb8f7;
+  border-color: var(--color-accent);
 }
 
 .clear-btn {
-  background: #1e2d45;
-  color: #8b9ab3;
-  border: 1px solid #2a3f5f;
+  background: var(--color-accent-bg);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
   padding: 0 0.9rem;
   cursor: pointer;

@@ -138,8 +138,8 @@ async function mountCanvas(canvas: HTMLCanvasElement | null, filePath: string) {
 }
 
 .viewer {
-  background: #0d1117;
-  border: 1px solid #1e2535;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   width: 90vw; /* 画面幅の90% */
   max-height: 90vh;
@@ -153,26 +153,26 @@ async function mountCanvas(canvas: HTMLCanvasElement | null, filePath: string) {
   align-items: flex-start;
   justify-content: space-between;
   padding: 1rem 1.5rem;
-  border-bottom: 1px solid #1e2535;
+  border-bottom: 1px solid var(--color-border);
   flex-shrink: 0; /* ヘッダーはスクロールしても縮まない */
 }
 
 .viewer-header h2 {
   margin: 0;
   font-size: 1rem;
-  color: #e2e8f0;
+  color: var(--color-text-heading);
 }
 
 .subtitle {
   margin: 0.2rem 0 0;
   font-size: 0.78rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 
 .close-btn {
   background: none;
   border: none;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
   font-size: 1.2rem;
   cursor: pointer;
   padding: 0 0.25rem;
@@ -181,7 +181,7 @@ async function mountCanvas(canvas: HTMLCanvasElement | null, filePath: string) {
 }
 
 .close-btn:hover {
-  color: #e2e8f0;
+  color: var(--color-text-heading);
 }
 
 /* CSS Grid で画像を均等に並べるグリッドレイアウト */
@@ -194,8 +194,8 @@ async function mountCanvas(canvas: HTMLCanvasElement | null, filePath: string) {
 }
 
 .image-cell {
-  background: #111827;
-  border: 1px solid #1e2535;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -203,7 +203,7 @@ async function mountCanvas(canvas: HTMLCanvasElement | null, filePath: string) {
 /* canvas を中央配置するラッパー */
 .canvas-wrap {
   position: relative; /* .render-error の absolute 配置の基準 */
-  background: #000;
+  background: var(--color-canvas-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -219,13 +219,13 @@ async function mountCanvas(canvas: HTMLCanvasElement | null, filePath: string) {
 /* 描画失敗時のエラーラベル（canvas-wrap の中央に absolute で配置）*/
 .render-error {
   position: absolute;
-  color: #f87171;
+  color: var(--color-danger);
   font-size: 0.78rem;
 }
 
 .image-meta {
   padding: 0.35rem 0.75rem;
   font-size: 0.75rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 </style>

@@ -158,7 +158,7 @@ onMounted(loadUnread)
 <style scoped>
 .lead {
   font-size: 0.85rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
   line-height: 1.7;
   margin-bottom: 1rem;
 }
@@ -171,9 +171,9 @@ onMounted(loadUnread)
 
 .control-row button,
 .sop-row button {
-  background: #1e2d45;
-  color: #7eb8f7;
-  border: 1px solid #2a3f5f;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border-strong);
   border-radius: 5px;
   padding: 0.4rem 0.9rem;
   cursor: pointer;
@@ -183,7 +183,7 @@ onMounted(loadUnread)
 
 .control-row button:hover,
 .sop-row button:hover {
-  background: #243550;
+  background: var(--color-accent-bg-hover);
 }
 
 .control-row button:disabled,
@@ -194,12 +194,12 @@ onMounted(loadUnread)
 
 .status-line {
   font-size: 0.85rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
   margin-bottom: 0.75rem;
 }
 
 .status-line.error {
-  color: #f87171;
+  color: var(--color-danger);
 }
 
 .list-section {
@@ -209,12 +209,12 @@ onMounted(loadUnread)
 .list-section h3 {
   margin: 0 0 0.5rem;
   font-size: 0.85rem;
-  color: #e2e8f0;
+  color: var(--color-text-heading);
 }
 
 .empty-line {
   font-size: 0.82rem;
-  color: #4a5a70;
+  color: var(--color-text-faint);
 }
 
 .sop-list {
@@ -230,21 +230,21 @@ onMounted(loadUnread)
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  background: #0d1117;
-  border: 1px solid #1e2535;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   padding: 0.5rem 0.75rem;
   font-size: 0.78rem;
 }
 
 .sop-uid {
-  color: #7eb8f7;
+  color: var(--color-accent);
   font-family: monospace;
   flex-shrink: 0;
 }
 
 .sop-path {
-  color: #8b9ab3;
+  color: var(--color-text-muted);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;

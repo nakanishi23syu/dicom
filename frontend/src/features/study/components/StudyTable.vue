@@ -152,8 +152,8 @@ function formatDate(raw: string): string {
 }
 
 .study-table thead tr {
-  background: #1e2535;
-  color: #8b9ab3;
+  background: var(--color-border);
+  color: var(--color-text-muted);
   text-transform: uppercase;
   font-size: 0.75rem;
   letter-spacing: 0.05em;
@@ -163,30 +163,30 @@ function formatDate(raw: string): string {
 .study-table td {
   padding: 0.625rem 1rem;
   text-align: left;
-  border-bottom: 1px solid #1e2535;
+  border-bottom: 1px solid var(--color-border);
   white-space: nowrap; /* セル内のテキストを折り返さない */
 }
 
 .study-row {
   cursor: pointer; /* クリック可能であることをマウスカーソルで示す */
-  color: #c8d6e5;
+  color: var(--color-text);
   transition: background 0.15s; /* ホバー時の背景色変化をなめらかにする */
 }
 
 .study-row:hover {
-  background: #1e2e44;
+  background: var(--color-thumbnail-selected-bg);
 }
 
 /* v-if で動的に付与されるクラス: 選択中の行を強調表示 */
 .study-row.selected {
-  background: #1a3a5c;
-  color: #7eb8f7;
+  background: var(--color-accent-selected-bg);
+  color: var(--color-accent);
 }
 
 .badge {
   display: inline-block;
-  background: #2a3f5f;
-  color: #7eb8f7;
+  background: var(--color-border-strong);
+  color: var(--color-accent);
   border-radius: 4px;
   padding: 1px 6px;
   font-size: 0.75rem;
@@ -196,7 +196,7 @@ function formatDate(raw: string): string {
 .state-msg {
   padding: 3rem;
   text-align: center;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -204,12 +204,12 @@ function formatDate(raw: string): string {
 }
 
 .state-msg.error {
-  color: #f87171;
+  color: var(--color-danger);
 }
 
 .hint {
   font-size: 0.8rem;
-  color: #566475;
+  color: var(--color-text-disabled);
 }
 
 /* CSS アニメーションで回転するスピナー */
@@ -217,8 +217,8 @@ function formatDate(raw: string): string {
   display: inline-block;
   width: 20px;
   height: 20px;
-  border: 2px solid #2a3f5f;
-  border-top-color: #7eb8f7; /* 1辺だけ色を変えて回転させると円形になる */
+  border: 2px solid var(--color-border-strong);
+  border-top-color: var(--color-accent); /* 1辺だけ色を変えて回転させると円形になる */
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   margin-bottom: 0.5rem;

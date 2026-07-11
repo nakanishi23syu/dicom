@@ -75,15 +75,15 @@ const series = computed(() => {
 
 .page-header {
   padding: 0.85rem 1.5rem;
-  background: #111827;
-  border-bottom: 1px solid #1e2535;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 
 .back-link {
   display: inline-block;
   font-size: 0.8rem;
-  color: #7eb8f7;
+  color: var(--color-accent);
   text-decoration: none;
   margin-bottom: 0.4rem;
 }
@@ -95,13 +95,13 @@ const series = computed(() => {
 .page-header h1 {
   margin: 0;
   font-size: 1rem;
-  color: #e2e8f0;
+  color: var(--color-text-heading);
 }
 
 .subtitle {
   margin: 0.15rem 0 0;
   font-size: 0.78rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 
 .page-main {
@@ -116,19 +116,19 @@ const series = computed(() => {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 
 .state-msg.error {
-  color: #f87171;
+  color: var(--color-danger);
 }
 
 .spinner {
   display: inline-block;
   width: 20px;
   height: 20px;
-  border: 2px solid #2a3f5f;
-  border-top-color: #7eb8f7;
+  border: 2px solid var(--color-border-strong);
+  border-top-color: var(--color-accent);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }

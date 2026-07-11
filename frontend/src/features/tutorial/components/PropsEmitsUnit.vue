@@ -108,12 +108,12 @@ const message = ref('')
 .demo-block h4 {
   margin: 0 0 0.5rem;
   font-size: 0.85rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 
 .lead {
   font-size: 0.82rem;
-  color: #566475;
+  color: var(--color-text-disabled);
   margin-bottom: 0.75rem;
   line-height: 1.6;
 }
@@ -121,6 +121,6 @@ const message = ref('')
 .computed-line {
   margin-top: 0.75rem;
   font-size: 0.85rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 </style>

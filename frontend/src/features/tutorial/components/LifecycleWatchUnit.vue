@@ -157,12 +157,12 @@ watchEffect(() => {
 .demo-block h4 {
   margin: 0 0 0.5rem;
   font-size: 0.85rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 
 .lead {
   font-size: 0.82rem;
-  color: #566475;
+  color: var(--color-text-disabled);
   margin-bottom: 0.75rem;
   line-height: 1.6;
 }
@@ -170,7 +170,7 @@ watchEffect(() => {
 .big-number {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #7eb8f7;
+  color: var(--color-accent);
 }
 
 .text-input {
@@ -178,16 +178,16 @@ watchEffect(() => {
   max-width: 320px;
   padding: 0.5rem 0.75rem;
   border-radius: 6px;
-  border: 1px solid #2a3f5f;
-  background: #0d1117;
-  color: #c8d6e5;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-bg);
+  color: var(--color-text);
   font-size: 0.9rem;
   margin-bottom: 0.75rem;
 }
 
 .text-input:focus {
   outline: none;
-  border-color: #7eb8f7;
+  border-color: var(--color-accent);
 }
 
 .log-list {
@@ -196,7 +196,7 @@ watchEffect(() => {
   flex-direction: column;
   gap: 0.25rem;
   font-size: 0.8rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 
 .counter-row {
@@ -206,9 +206,9 @@ watchEffect(() => {
 }
 
 .counter-row button {
-  background: #1e2d45;
-  color: #7eb8f7;
-  border: 1px solid #2a3f5f;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border-strong);
   border-radius: 5px;
   padding: 0.4rem 0.8rem;
   cursor: pointer;
@@ -216,11 +216,11 @@ watchEffect(() => {
 }
 
 .counter-row button:hover {
-  background: #243550;
+  background: var(--color-accent-bg-hover);
 }
 
 .computed-line {
   font-size: 0.85rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 </style>

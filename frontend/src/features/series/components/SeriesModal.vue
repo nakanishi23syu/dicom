@@ -118,8 +118,8 @@ function formatDate(raw: string): string {
 }
 
 .modal {
-  background: #111827;
-  border: 1px solid #1e2535;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   width: 700px;
   max-width: 95vw; /* 画面幅が狭い場合は画面幅に合わせる */
@@ -134,25 +134,25 @@ function formatDate(raw: string): string {
   align-items: flex-start;
   justify-content: space-between;
   padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid #1e2535;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .modal-header h2 {
   margin: 0;
   font-size: 1.1rem;
-  color: #e2e8f0;
+  color: var(--color-text-heading);
 }
 
 .subtitle {
   margin: 0.25rem 0 0;
   font-size: 0.8rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 
 .close-btn {
   background: none;
   border: none;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
   font-size: 1.2rem;
   cursor: pointer;
   padding: 0 0.25rem;
@@ -161,7 +161,7 @@ function formatDate(raw: string): string {
 }
 
 .close-btn:hover {
-  color: #e2e8f0;
+  color: var(--color-text-heading);
 }
 
 .series-list {
@@ -174,8 +174,8 @@ function formatDate(raw: string): string {
 }
 
 .series-card {
-  background: #1a2133;
-  border: 1px solid #1e2d45;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-accent-bg);
   border-radius: 6px;
   padding: 0.875rem 1rem;
   cursor: pointer;
@@ -186,8 +186,8 @@ function formatDate(raw: string): string {
 }
 
 .series-card:hover {
-  border-color: #3b6ea8;
-  background: #1e2e44;
+  border-color: var(--color-thumbnail-selected-border);
+  background: var(--color-thumbnail-selected-bg);
 }
 
 .series-header {
@@ -200,13 +200,13 @@ function formatDate(raw: string): string {
 .series-num {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #7eb8f7;
+  color: var(--color-accent);
 }
 
 .badge {
   display: inline-block;
-  background: #2a3f5f;
-  color: #7eb8f7;
+  background: var(--color-border-strong);
+  color: var(--color-accent);
   border-radius: 4px;
   padding: 1px 6px;
   font-size: 0.7rem;
@@ -215,20 +215,20 @@ function formatDate(raw: string): string {
 
 .series-desc {
   font-size: 0.875rem;
-  color: #c8d6e5;
+  color: var(--color-text);
   margin-bottom: 0.5rem;
   word-break: break-all; /* 長いUID等が溢れないように折り返す */
 }
 
 .series-meta {
   font-size: 0.75rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
   margin-bottom: 0.35rem;
 }
 
 .series-hint {
   font-size: 0.7rem;
-  color: #4a5a70;
+  color: var(--color-text-faint);
   font-style: italic;
 }
 </style>

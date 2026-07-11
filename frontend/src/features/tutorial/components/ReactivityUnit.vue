@@ -170,7 +170,7 @@ const reversedName = computed(() => name.value.split('').reverse().join(''))
 // count の符号によって文字色を変える。
 // v-bind は :属性名="式" の形で、式の結果を属性値として渡す。
 const countStyle = computed(() => ({
-  color: count.value > 0 ? '#4ade80' : count.value < 0 ? '#f87171' : '#c8d6e5',
+  color: count.value > 0 ? 'var(--color-success)' : count.value < 0 ? 'var(--color-danger)' : 'var(--color-text)',
 }))
 </script>
 
@@ -182,7 +182,7 @@ const countStyle = computed(() => ({
 .demo-block h4 {
   margin: 0 0 0.75rem;
   font-size: 0.85rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 
 .counter-row {
@@ -195,15 +195,15 @@ const countStyle = computed(() => ({
   width: 2.2rem;
   height: 2.2rem;
   border-radius: 6px;
-  border: 1px solid #2a3f5f;
-  background: #1e2d45;
-  color: #7eb8f7;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
   font-size: 1.1rem;
   cursor: pointer;
 }
 
 .counter-row button:hover {
-  background: #243550;
+  background: var(--color-accent-bg-hover);
 }
 
 .count-value {
@@ -216,7 +216,7 @@ const countStyle = computed(() => ({
 .computed-line {
   margin-top: 0.75rem;
   font-size: 0.85rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 
 .text-input {
@@ -224,14 +224,14 @@ const countStyle = computed(() => ({
   max-width: 320px;
   padding: 0.5rem 0.75rem;
   border-radius: 6px;
-  border: 1px solid #2a3f5f;
-  background: #0d1117;
-  color: #c8d6e5;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-bg);
+  color: var(--color-text);
   font-size: 0.9rem;
 }
 
 .text-input:focus {
   outline: none;
-  border-color: #7eb8f7;
+  border-color: var(--color-accent);
 }
 </style>

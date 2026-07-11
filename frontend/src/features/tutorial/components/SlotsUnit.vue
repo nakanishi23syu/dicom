@@ -104,6 +104,6 @@ import SlotsCardBox from './SlotsCardBox.vue'
 }
 
 .custom-footer {
-  color: #7eb8f7;
+  color: var(--color-accent);
 }
 </style>

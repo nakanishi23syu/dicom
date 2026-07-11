@@ -42,30 +42,30 @@ defineProps<{
 
 <style scoped>
 .card {
-  background: #0d1117;
-  border: 1px solid #2a3f5f;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
   overflow: hidden;
 }
 
 .card-title {
-  background: #1a2133;
+  background: var(--color-surface-alt);
   padding: 0.5rem 0.9rem;
   font-size: 0.8rem;
   font-weight: 600;
-  color: #7eb8f7;
+  color: var(--color-accent);
 }
 
 .card-body {
   padding: 0.9rem;
   font-size: 0.85rem;
-  color: #c8d6e5;
+  color: var(--color-text);
 }
 
 .card-footer {
   padding: 0.4rem 0.9rem;
   font-size: 0.75rem;
-  color: #566475;
-  border-top: 1px solid #1e2535;
+  color: var(--color-text-disabled);
+  border-top: 1px solid var(--color-border);
 }
 </style>

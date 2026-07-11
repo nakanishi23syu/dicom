@@ -218,12 +218,12 @@ const wrapper = reactive({ inner: innerRef })
 .demo-block h4 {
   margin: 0 0 0.5rem;
   font-size: 0.85rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 
 .lead {
   font-size: 0.82rem;
-  color: #566475;
+  color: var(--color-text-disabled);
   margin-bottom: 0.75rem;
   line-height: 1.7;
 }
@@ -236,9 +236,9 @@ const wrapper = reactive({ inner: innerRef })
 
 .control-row button,
 .increment-btn {
-  background: #1e2d45;
-  color: #7eb8f7;
-  border: 1px solid #2a3f5f;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border-strong);
   border-radius: 5px;
   padding: 0.4rem 0.9rem;
   cursor: pointer;
@@ -247,7 +247,7 @@ const wrapper = reactive({ inner: innerRef })
 
 .control-row button:hover,
 .increment-btn:hover {
-  background: #243550;
+  background: var(--color-accent-bg-hover);
 }
 
 .increment-btn {
@@ -264,17 +264,17 @@ const wrapper = reactive({ inner: innerRef })
 .compute-table td {
   padding: 0.5rem 0.75rem;
   text-align: left;
-  border-bottom: 1px solid #1e2535;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .compute-table th {
-  color: #8b9ab3;
+  color: var(--color-text-muted);
   font-size: 0.72rem;
   text-transform: uppercase;
 }
 
 .count-cell {
-  color: #7eb8f7;
+  color: var(--color-accent);
   font-weight: 700;
 }
 
@@ -291,13 +291,13 @@ const wrapper = reactive({ inner: innerRef })
 }
 
 .result-box.broken {
-  background: #2a1a1a;
-  border-color: #5c2a2a;
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger-border);
 }
 
 .result-box.fixed {
-  background: #16281c;
-  border-color: #2a5c3a;
+  background: var(--color-success-bg);
+  border-color: var(--color-success-border);
 }
 
 .result-label {
@@ -306,27 +306,27 @@ const wrapper = reactive({ inner: innerRef })
 }
 
 .result-box.broken .result-label {
-  color: #f87171;
+  color: var(--color-danger);
 }
 
 .result-box.fixed .result-label {
-  color: #4ade80;
+  color: var(--color-success);
 }
 
 .result-value {
   font-size: 1.4rem;
   font-weight: 700;
-  color: #e2e8f0;
+  color: var(--color-text-heading);
 }
 
 .result-note {
   font-size: 0.7rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
   margin-top: 0.25rem;
 }
 
 .computed-line {
   font-size: 0.85rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 </style>

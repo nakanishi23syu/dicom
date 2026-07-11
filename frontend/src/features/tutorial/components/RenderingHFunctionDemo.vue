@@ -51,14 +51,14 @@ export default defineComponent({
 
 .h-demo-count {
   font-size: 0.9rem;
-  color: #c8d6e5;
+  color: var(--color-text);
   min-width: 8ch;
 }
 
 .h-demo-button {
-  background: #1e2d45;
-  color: #7eb8f7;
-  border: 1px solid #2a3f5f;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border-strong);
   border-radius: 5px;
   padding: 0.35rem 0.8rem;
   cursor: pointer;

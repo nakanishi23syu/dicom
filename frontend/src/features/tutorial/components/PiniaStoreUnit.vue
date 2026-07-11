@@ -83,7 +83,7 @@ const store = useTutorialCounterStore()
 <style scoped>
 .lead {
   font-size: 0.85rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
   line-height: 1.7;
   margin-bottom: 1rem;
 }
@@ -95,9 +95,9 @@ const store = useTutorialCounterStore()
 }
 
 .control-row button {
-  background: #1e2d45;
-  color: #7eb8f7;
-  border: 1px solid #2a3f5f;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border-strong);
   border-radius: 5px;
   padding: 0.4rem 0.9rem;
   cursor: pointer;
@@ -105,12 +105,12 @@ const store = useTutorialCounterStore()
 }
 
 .control-row button:hover {
-  background: #243550;
+  background: var(--color-accent-bg-hover);
 }
 
 .computed-line {
   font-size: 0.85rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
   margin-bottom: 1rem;
 }
 </style>

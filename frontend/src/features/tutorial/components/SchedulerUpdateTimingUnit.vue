@@ -304,12 +304,12 @@ function bumpCounterThreeTimes() {
 .demo-block h4 {
   margin: 0 0 0.5rem;
   font-size: 0.85rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 
 .lead {
   font-size: 0.82rem;
-  color: #566475;
+  color: var(--color-text-disabled);
   margin-bottom: 0.75rem;
   line-height: 1.7;
 }
@@ -322,9 +322,9 @@ function bumpCounterThreeTimes() {
 
 .control-row button,
 .demo-block > button {
-  background: #1e2d45;
-  color: #7eb8f7;
-  border: 1px solid #2a3f5f;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border-strong);
   border-radius: 5px;
   padding: 0.4rem 0.9rem;
   cursor: pointer;
@@ -333,7 +333,7 @@ function bumpCounterThreeTimes() {
 
 .control-row button:hover,
 .demo-block > button:hover {
-  background: #243550;
+  background: var(--color-accent-bg-hover);
 }
 
 .demo-block > button {
@@ -342,28 +342,28 @@ function bumpCounterThreeTimes() {
 
 .computed-line {
   font-size: 0.85rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 
 .side-note {
   margin-top: 0.75rem;
   font-size: 0.78rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
   line-height: 1.7;
-  background: #0d1117;
-  border: 1px dashed #2a3f5f;
+  background: var(--color-bg);
+  border: 1px dashed var(--color-border-strong);
   border-radius: 6px;
   padding: 0.6rem 0.8rem;
 }
 
 .target-line {
   font-size: 0.9rem;
-  color: #c8d6e5;
+  color: var(--color-text);
   margin-bottom: 0.75rem;
 }
 
 .target-line span {
-  color: #7eb8f7;
+  color: var(--color-accent);
   font-weight: 700;
 }
 
@@ -380,22 +380,22 @@ function bumpCounterThreeTimes() {
 .flush-table td {
   padding: 0.5rem 0.75rem;
   text-align: left;
-  border-bottom: 1px solid #1e2535;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .flush-table th {
-  color: #8b9ab3;
+  color: var(--color-text-muted);
   font-size: 0.72rem;
   text-transform: uppercase;
 }
 
 .tick-value {
-  color: #7eb8f7;
+  color: var(--color-accent);
   font-weight: 700;
 }
 
 .count-cell {
-  color: #7eb8f7;
+  color: var(--color-accent);
   font-weight: 700;
 }
 </style>

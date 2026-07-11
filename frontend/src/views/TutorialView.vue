@@ -68,6 +68,7 @@ import SchedulerUpdateTimingUnit from '@/features/tutorial/components/SchedulerU
 import KeyDiffAlgorithmUnit from '@/features/tutorial/components/KeyDiffAlgorithmUnit.vue'
 import CustomDirectivesUnit from '@/features/tutorial/components/CustomDirectivesUnit.vue'
 import GraphQLUnit from '@/features/tutorial/components/GraphQLUnit.vue'
+import CommonComponentsUnit from '@/features/tutorial/components/CommonComponentsUnit.vue'
 
 // ======================================================
 // units — 単元の一覧データ
@@ -147,6 +148,12 @@ const units: TutorialUnit[] = [
     group: '応用・内部実装編',
     component: GraphQLUnit,
   },
+  {
+    id: 'common-components',
+    label: '汎用UIコンポーネント',
+    group: '応用・内部実装編',
+    component: CommonComponentsUnit,
+  },
 ]
 
 // 現在選択中の単元ID。最初は先頭の単元を表示する。
@@ -185,15 +192,15 @@ const groupedUnits = computed(() => {
 
 .page-header {
   padding: 1.25rem 1.5rem 1rem;
-  border-bottom: 1px solid #1e2535;
-  background: #111827;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
   flex-shrink: 0;
 }
 
 .back-link {
   display: inline-block;
   font-size: 0.8rem;
-  color: #7eb8f7;
+  color: var(--color-accent);
   text-decoration: none;
   margin-bottom: 0.5rem;
 }
@@ -205,13 +212,13 @@ const groupedUnits = computed(() => {
 .page-header h1 {
   margin: 0;
   font-size: 1.2rem;
-  color: #e2e8f0;
+  color: var(--color-text-heading);
 }
 
 .page-desc {
   margin: 0.35rem 0 0;
   font-size: 0.85rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 
 .page-body {
@@ -223,8 +230,8 @@ const groupedUnits = computed(() => {
 .sidebar {
   width: 260px;
   flex-shrink: 0;
-  border-right: 1px solid #1e2535;
-  background: #0d1117;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-bg);
   padding: 0.75rem;
   display: flex;
   flex-direction: column;
@@ -235,7 +242,7 @@ const groupedUnits = computed(() => {
 .group-heading {
   padding: 0.6rem 0.75rem 0.2rem;
   font-size: 0.68rem;
-  color: #4a5a70;
+  color: var(--color-text-faint);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -252,7 +259,7 @@ const groupedUnits = computed(() => {
   border: 1px solid transparent;
   border-radius: 6px;
   padding: 0.6rem 0.75rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
   font-size: 0.83rem;
   text-align: left;
   cursor: pointer;
@@ -262,14 +269,14 @@ const groupedUnits = computed(() => {
 }
 
 .unit-nav-item:hover {
-  background: #1a2133;
-  color: #c8d6e5;
+  background: var(--color-surface-alt);
+  color: var(--color-text);
 }
 
 .unit-nav-item.active {
-  background: #1a3a5c;
-  border-color: #2a3f5f;
-  color: #7eb8f7;
+  background: var(--color-accent-selected-bg);
+  border-color: var(--color-border-strong);
+  color: var(--color-accent);
 }
 
 .unit-index {
@@ -279,8 +286,8 @@ const groupedUnits = computed(() => {
   width: 1.4rem;
   height: 1.4rem;
   border-radius: 50%;
-  background: #1e2d45;
-  color: #7eb8f7;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
   font-size: 0.7rem;
   flex-shrink: 0;
 }

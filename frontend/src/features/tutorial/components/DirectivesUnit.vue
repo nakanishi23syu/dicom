@@ -164,13 +164,13 @@ function removeTodo(id: number) {
 .demo-block h4 {
   margin: 0 0 0.75rem;
   font-size: 0.85rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 
 .toggle-btn {
-  background: #1e2d45;
-  color: #7eb8f7;
-  border: 1px solid #2a3f5f;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border-strong);
   border-radius: 5px;
   padding: 0.4rem 0.9rem;
   font-size: 0.85rem;
@@ -179,7 +179,7 @@ function removeTodo(id: number) {
 }
 
 .toggle-btn:hover {
-  background: #243550;
+  background: var(--color-accent-bg-hover);
 }
 
 .badge {
@@ -188,15 +188,15 @@ function removeTodo(id: number) {
 }
 
 .badge-on {
-  color: #4ade80;
+  color: var(--color-success);
 }
 
 .badge-off {
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 
 .badge-show {
-  color: #facc15;
+  color: var(--color-warning);
 }
 
 .add-form {
@@ -206,9 +206,9 @@ function removeTodo(id: number) {
 }
 
 .add-form button {
-  background: #1e2d45;
-  color: #7eb8f7;
-  border: 1px solid #2a3f5f;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border-strong);
   border-radius: 5px;
   padding: 0.5rem 0.9rem;
   cursor: pointer;
@@ -218,20 +218,20 @@ function removeTodo(id: number) {
   flex: 1;
   padding: 0.5rem 0.75rem;
   border-radius: 6px;
-  border: 1px solid #2a3f5f;
-  background: #0d1117;
-  color: #c8d6e5;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-bg);
+  color: var(--color-text);
   font-size: 0.9rem;
 }
 
 .text-input:focus {
   outline: none;
-  border-color: #7eb8f7;
+  border-color: var(--color-accent);
 }
 
 .empty-msg {
   font-size: 0.85rem;
-  color: #566475;
+  color: var(--color-text-disabled);
 }
 
 .todo-list {
@@ -245,8 +245,8 @@ function removeTodo(id: number) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #1a2133;
-  border: 1px solid #1e2d45;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-accent-bg);
   border-radius: 5px;
   padding: 0.5rem 0.75rem;
   font-size: 0.85rem;
@@ -258,18 +258,18 @@ function removeTodo(id: number) {
 
 .todo-item span.done {
   text-decoration: line-through;
-  color: #566475;
+  color: var(--color-text-disabled);
 }
 
 .remove-btn {
   background: none;
   border: none;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
   cursor: pointer;
   font-size: 0.9rem;
 }
 
 .remove-btn:hover {
-  color: #f87171;
+  color: var(--color-danger);
 }
 </style>

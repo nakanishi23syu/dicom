@@ -97,7 +97,7 @@ const trackerB = useMouseTracker(boxB)
 <style scoped>
 .lead {
   font-size: 0.85rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
   line-height: 1.7;
   margin-bottom: 1rem;
 }
@@ -109,12 +109,12 @@ const trackerB = useMouseTracker(boxB)
 
 .tracker-box {
   flex: 1;
-  background: #0d1117;
-  border: 1px dashed #2a3f5f;
+  background: var(--color-bg);
+  border: 1px dashed var(--color-border-strong);
   border-radius: 6px;
   padding: 1.5rem;
   text-align: center;
-  color: #c8d6e5;
+  color: var(--color-text);
 }
 
 .tracker-box p {
@@ -123,7 +123,7 @@ const trackerB = useMouseTracker(boxB)
 
 .coords {
   font-size: 0.85rem;
-  color: #7eb8f7;
+  color: var(--color-accent);
   font-variant-numeric: tabular-nums;
 }
 </style>

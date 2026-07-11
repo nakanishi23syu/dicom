@@ -280,20 +280,20 @@ const useKeepAlive = ref(true)
 .demo-block h4 {
   margin: 0 0 0.5rem;
   font-size: 0.85rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 
 .lead {
   font-size: 0.82rem;
-  color: #566475;
+  color: var(--color-text-disabled);
   margin-bottom: 0.75rem;
   line-height: 1.7;
 }
 
 .demo-block > button {
-  background: #1e2d45;
-  color: #7eb8f7;
-  border: 1px solid #2a3f5f;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border-strong);
   border-radius: 5px;
   padding: 0.4rem 0.9rem;
   cursor: pointer;
@@ -302,18 +302,18 @@ const useKeepAlive = ref(true)
 }
 
 .demo-block > button:hover {
-  background: #243550;
+  background: var(--color-accent-bg-hover);
 }
 
 .once-line {
   font-size: 0.85rem;
-  color: #facc15;
+  color: var(--color-warning);
   margin-top: 0.5rem;
 }
 
 .normal-line {
   font-size: 0.85rem;
-  color: #4ade80;
+  color: var(--color-success);
 }
 
 .control-row {
@@ -325,9 +325,9 @@ const useKeepAlive = ref(true)
 }
 
 .control-row button {
-  background: #1e2d45;
-  color: #7eb8f7;
-  border: 1px solid #2a3f5f;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border-strong);
   border-radius: 5px;
   padding: 0.4rem 0.9rem;
   cursor: pointer;
@@ -335,7 +335,7 @@ const useKeepAlive = ref(true)
 }
 
 .control-row button:hover:not(:disabled) {
-  background: #243550;
+  background: var(--color-accent-bg-hover);
 }
 
 .control-row button:disabled {
@@ -345,7 +345,7 @@ const useKeepAlive = ref(true)
 
 .checkbox-label {
   font-size: 0.82rem;
-  color: #c8d6e5;
+  color: var(--color-text);
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -354,31 +354,31 @@ const useKeepAlive = ref(true)
 .memo-row {
   display: flex;
   justify-content: space-between;
-  background: #0d1117;
-  border: 1px solid #1e2535;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   padding: 0.6rem 0.8rem;
   font-size: 0.82rem;
-  color: #c8d6e5;
+  color: var(--color-text);
 }
 
 .render-count {
-  color: #7eb8f7;
+  color: var(--color-accent);
 }
 
 .lifecycle-box {
-  background: #0d1117;
-  border: 1px dashed #2a3f5f;
+  background: var(--color-bg);
+  border: 1px dashed var(--color-border-strong);
   border-radius: 6px;
   padding: 0.75rem;
   font-size: 0.85rem;
-  color: #c8d6e5;
+  color: var(--color-text);
   margin-bottom: 0.75rem;
 }
 
 .lifecycle-log {
   font-size: 0.78rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
   padding-left: 1.2rem;
   max-height: 180px;
   overflow-y: auto;

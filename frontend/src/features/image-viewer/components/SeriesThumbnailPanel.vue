@@ -109,8 +109,8 @@ async function renderThumbnail(canvas: HTMLCanvasElement, filePath: string) {
 .thumb-panel {
   width: 220px;
   flex-shrink: 0;
-  border-right: 1px solid #1e2535;
-  background: #0d1117;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-bg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -119,7 +119,7 @@ async function renderThumbnail(canvas: HTMLCanvasElement, filePath: string) {
 .thumb-panel-title {
   padding: 0.75rem 1rem 0.5rem;
   font-size: 0.75rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
   flex-shrink: 0;
 }
 
@@ -140,8 +140,8 @@ async function renderThumbnail(canvas: HTMLCanvasElement, filePath: string) {
 }
 
 .thumb-item {
-  background: #111827;
-  border: 1px solid #1e2535;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   padding: 0.4rem;
   cursor: pointer;
@@ -155,20 +155,20 @@ async function renderThumbnail(canvas: HTMLCanvasElement, filePath: string) {
 }
 
 .thumb-item:hover {
-  border-color: #3b6ea8;
-  background: #1e2e44;
+  border-color: var(--color-thumbnail-selected-border);
+  background: var(--color-thumbnail-selected-bg);
 }
 
 .thumb-item.active {
-  border-color: #7eb8f7;
-  background: #1a3a5c;
+  border-color: var(--color-accent);
+  background: var(--color-accent-selected-bg);
 }
 
 .thumb-canvas-wrap {
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
-  background: #000;
+  background: var(--color-canvas-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -183,12 +183,12 @@ async function renderThumbnail(canvas: HTMLCanvasElement, filePath: string) {
 
 .thumb-error {
   position: absolute;
-  color: #f87171;
+  color: var(--color-danger);
   font-size: 0.7rem;
 }
 
 .thumb-label {
   font-size: 0.7rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 </style>

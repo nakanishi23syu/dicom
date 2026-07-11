@@ -45,9 +45,9 @@ defineEmits<{
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  background: #1e2d45;
-  border: 1px solid #2a3f5f;
-  color: #c8d6e5;
+  background: var(--color-accent-bg);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text);
   border-radius: 20px;
   padding: 0.45rem 1rem;
   font-size: 0.85rem;
@@ -58,11 +58,11 @@ defineEmits<{
 }
 
 .like-btn:hover {
-  background: #243550;
+  background: var(--color-accent-bg-hover);
 }
 
 .like-btn.liked {
-  border-color: #f87171;
-  color: #f87171;
+  border-color: var(--color-danger);
+  color: var(--color-danger);
 }
 </style>

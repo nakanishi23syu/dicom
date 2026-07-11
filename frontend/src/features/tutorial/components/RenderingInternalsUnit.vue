@@ -156,12 +156,12 @@ const tickCount = ref(0)
 .demo-block h4 {
   margin: 0 0 0.5rem;
   font-size: 0.85rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 
 .lead {
   font-size: 0.82rem;
-  color: #566475;
+  color: var(--color-text-disabled);
   margin-bottom: 0.75rem;
   line-height: 1.7;
 }
@@ -175,26 +175,26 @@ const tickCount = ref(0)
 
 .code-col-title {
   font-size: 0.72rem;
-  color: #7eb8f7;
+  color: var(--color-accent);
   margin-bottom: 0.35rem;
 }
 
 .code-box {
-  background: #0d1117;
-  border: 1px solid #1e2535;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   padding: 0.75rem;
   font-size: 0.75rem;
   line-height: 1.6;
-  color: #c8d6e5;
+  color: var(--color-text);
   overflow-x: auto;
   white-space: pre;
 }
 
 .tick-btn {
-  background: #1e2d45;
-  color: #7eb8f7;
-  border: 1px solid #2a3f5f;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border-strong);
   border-radius: 5px;
   padding: 0.4rem 0.9rem;
   cursor: pointer;
@@ -203,14 +203,14 @@ const tickCount = ref(0)
 }
 
 .tick-btn:hover {
-  background: #243550;
+  background: var(--color-accent-bg-hover);
 }
 
 .static-note {
   font-size: 0.82rem;
-  color: #8b9ab3;
-  background: #0d1117;
-  border: 1px dashed #2a3f5f;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  border: 1px dashed var(--color-border-strong);
   border-radius: 6px;
   padding: 0.6rem 0.8rem;
 }

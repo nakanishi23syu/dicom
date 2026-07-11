@@ -30,8 +30,8 @@ const count = ref(0)
 
 <style scoped>
 .tab-content {
-  background: #0d1117;
-  border: 1px dashed #2a3f5f;
+  background: var(--color-bg);
+  border: 1px dashed var(--color-border-strong);
   border-radius: 6px;
   padding: 1rem;
   text-align: center;
@@ -39,21 +39,21 @@ const count = ref(0)
 
 .tab-label {
   font-size: 0.78rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
   margin-bottom: 0.3rem;
 }
 
 .tab-count {
   font-size: 1.6rem;
   font-weight: 700;
-  color: #7eb8f7;
+  color: var(--color-accent);
   margin-bottom: 0.5rem;
 }
 
 .tab-content button {
-  background: #1e2d45;
-  color: #7eb8f7;
-  border: 1px solid #2a3f5f;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border-strong);
   border-radius: 5px;
   padding: 0.35rem 0.8rem;
   cursor: pointer;

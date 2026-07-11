@@ -117,8 +117,8 @@ onMounted(() => store.fetchStudies())
   justify-content: space-between;
   padding: 0 1.5rem;
   height: 52px;
-  background: #111827;
-  border-bottom: 1px solid #1e2535;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 
@@ -129,14 +129,14 @@ onMounted(() => store.fetchStudies())
 }
 
 .logo-icon {
-  color: #7eb8f7;
+  color: var(--color-accent);
   font-size: 1.3rem;
 }
 
 .logo-text {
   font-size: 1rem;
   font-weight: 600;
-  color: #e2e8f0;
+  color: var(--color-text-heading);
   letter-spacing: 0.03em;
 }
 
@@ -148,7 +148,7 @@ onMounted(() => store.fetchStudies())
 
 .tutorial-link {
   font-size: 0.85rem;
-  color: #7eb8f7;
+  color: var(--color-accent);
   text-decoration: none;
   padding: 0.35rem 0.6rem;
 }
@@ -158,9 +158,9 @@ onMounted(() => store.fetchStudies())
 }
 
 .refresh-btn {
-  background: #1e2d45;
-  color: #7eb8f7;
-  border: 1px solid #2a3f5f;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border-strong);
   border-radius: 5px;
   padding: 0.35rem 0.85rem;
   font-size: 0.85rem;
@@ -172,7 +172,7 @@ onMounted(() => store.fetchStudies())
 }
 
 .refresh-btn:hover:not(:disabled) {
-  background: #243550;
+  background: var(--color-accent-bg-hover);
 }
 
 .refresh-btn:disabled {
@@ -203,21 +203,21 @@ onMounted(() => store.fetchStudies())
   align-items: center;
   gap: 0.75rem;
   padding: 1rem 1.5rem 0.75rem;
-  border-bottom: 1px solid #1e2535;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .section-title {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
 .study-count {
   font-size: 0.78rem;
-  background: #1e2d45;
-  color: #7eb8f7;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
   border-radius: 10px;
   padding: 1px 8px;
 }

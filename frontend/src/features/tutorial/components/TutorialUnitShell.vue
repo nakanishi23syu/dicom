@@ -69,71 +69,71 @@ defineProps<{
 .unit-header h2 {
   margin: 0;
   font-size: 1.3rem;
-  color: #e2e8f0;
+  color: var(--color-text-heading);
 }
 
 .unit-subtitle {
   margin: 0.35rem 0 0;
   font-size: 0.9rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 
 .unit-body {
-  background: #111827;
-  border: 1px solid #1e2535;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 1.25rem;
 }
 
 .analogy-box {
-  background: #1a2133;
-  border: 1px solid #2a3f5f;
-  border-left: 3px solid #7eb8f7;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border-strong);
+  border-left: 3px solid var(--color-accent);
   border-radius: 6px;
   padding: 0.9rem 1.1rem;
   font-size: 0.88rem;
   line-height: 1.7;
-  color: #c8d6e5;
+  color: var(--color-text);
 }
 
 .analogy-box h3 {
   margin: 0 0 0.4rem;
   font-size: 0.8rem;
-  color: #7eb8f7;
+  color: var(--color-accent);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .react-box {
-  background: #1f1a2e;
-  border: 1px solid #3a2f5f;
-  border-left: 3px solid #a78bfa;
+  background: var(--color-purple-bg);
+  border: 1px solid var(--color-purple-border);
+  border-left: 3px solid var(--color-purple);
   border-radius: 6px;
   padding: 0.9rem 1.1rem;
   font-size: 0.88rem;
   line-height: 1.7;
-  color: #c8d6e5;
+  color: var(--color-text);
 }
 
 .react-box h3 {
   margin: 0 0 0.4rem;
   font-size: 0.8rem;
-  color: #a78bfa;
+  color: var(--color-purple);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .react-box :deep(code) {
-  background: #2a2440;
-  color: #d6c9ff;
+  background: var(--color-purple-code-bg);
+  color: var(--color-purple-code-text);
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
   font-size: 0.85em;
 }
 
 .unit-body :deep(code) {
-  background: #1a2133;
-  color: #7eb8f7;
+  background: var(--color-surface-alt);
+  color: var(--color-accent);
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
   font-size: 0.85em;

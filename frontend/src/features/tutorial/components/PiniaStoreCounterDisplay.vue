@@ -26,8 +26,8 @@ const store = useTutorialCounterStore()
 
 <style scoped>
 .display-box {
-  background: #0d1117;
-  border: 1px dashed #2a3f5f;
+  background: var(--color-bg);
+  border: 1px dashed var(--color-border-strong);
   border-radius: 6px;
   padding: 1rem;
   text-align: center;
@@ -35,18 +35,18 @@ const store = useTutorialCounterStore()
 
 .label {
   font-size: 0.75rem;
-  color: #566475;
+  color: var(--color-text-disabled);
   margin-bottom: 0.4rem;
 }
 
 .value {
   font-size: 1.6rem;
   font-weight: 700;
-  color: #7eb8f7;
+  color: var(--color-accent);
 }
 
 .sub {
   font-size: 0.8rem;
-  color: #8b9ab3;
+  color: var(--color-text-muted);
 }
 </style>

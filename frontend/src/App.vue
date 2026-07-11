@@ -46,8 +46,8 @@
 html,
 body {
   height: 100%;
-  background: #0d1117;
-  color: #c8d6e5;
+  background: var(--color-bg);
+  color: var(--color-text);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 

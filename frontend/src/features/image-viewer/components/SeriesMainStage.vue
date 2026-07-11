@@ -116,7 +116,7 @@ function resetZoom() {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #000;
+  background: var(--color-canvas-bg);
 }
 
 .main-viewport {
@@ -140,7 +140,7 @@ function resetZoom() {
 
 .main-error {
   position: absolute;
-  color: #f87171;
+  color: var(--color-danger);
   font-size: 0.85rem;
 }
 
@@ -152,7 +152,7 @@ function resetZoom() {
   align-items: center;
   gap: 0.5rem;
   background: rgba(17, 24, 39, 0.85);
-  border: 1px solid #1e2535;
+  border: 1px solid var(--color-border);
   border-radius: 20px;
   padding: 0.35rem 0.6rem;
 }
@@ -161,9 +161,9 @@ function resetZoom() {
   width: 1.8rem;
   height: 1.8rem;
   border-radius: 50%;
-  border: 1px solid #2a3f5f;
-  background: #1e2d45;
-  color: #7eb8f7;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
   cursor: pointer;
   font-size: 0.9rem;
 }
@@ -175,7 +175,7 @@ function resetZoom() {
 
 .zoom-level {
   font-size: 0.75rem;
-  color: #c8d6e5;
+  color: var(--color-text);
   min-width: 3.5ch;
   text-align: center;
 }
@@ -196,7 +196,7 @@ function resetZoom() {
   align-items: center;
   gap: 0.75rem;
   background: rgba(17, 24, 39, 0.85);
-  border: 1px solid #1e2535;
+  border: 1px solid var(--color-border);
   border-radius: 24px;
   padding: 0.4rem 0.9rem;
 }
@@ -205,15 +205,15 @@ function resetZoom() {
   width: 2.2rem;
   height: 2.2rem;
   border-radius: 50%;
-  border: 1px solid #2a3f5f;
-  background: #1e2d45;
-  color: #7eb8f7;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
   font-size: 1rem;
   cursor: pointer;
 }
 
 .nav-btn:hover:not(:disabled) {
-  background: #243550;
+  background: var(--color-accent-bg-hover);
 }
 
 .nav-btn:disabled {
@@ -223,7 +223,7 @@ function resetZoom() {
 
 .nav-count {
   font-size: 0.8rem;
-  color: #c8d6e5;
+  color: var(--color-text);
   min-width: 5ch;
   text-align: center;
 }
