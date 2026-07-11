@@ -72,10 +72,31 @@ DicomLearning.GraphQL/
 │   ├── DicomDbContext.cs    … EF CoreのDbContext。テーブル名・index・リレーションの定義
 │   └── DbSeeder.cs          … 開発用のサンプルデータ投入（テーブルが空の場合のみ）
 ├── Migrations/               … `dotnet ef migrations add` で生成されるスキーマ変更履歴
+├── Configuration/
+│   └── DicomStorageOptions.cs … DICOMファイル保存先フォルダの設定（appsettings.jsonのStorageセクション）
+├── Services/
+│   ├── DicomUploadService.cs … アップロードされたDICOMファイル1枚の解析・保存・DB登録
+│   └── DicomUploadResult.cs   … アップロード結果（成功/失敗）を表す型
 └── GraphQL/
     ├── Query.cs             … 読み取り操作（検索・一覧取得）
     └── Mutation.cs          … 書き込み操作（既読/未読の切り替え、並べ替え保存）
 ```
+
+## 3-2. DICOMアップロード機能
+
+`POST /api/dicom-upload`（`multipart/form-data`、キー名 `files` で複数ファイル）にDICOMファイルを送ると、
+[fo-dicom](https://github.com/fo-dicom/fo-dicom) でタグを解析し、
+
+1. `Storage/dicom/{StudyInstanceUID}/{SeriesInstanceUID}/{SOPInstanceUID}.dcm` にファイル本体を保存
+   （保存先は Vue側ではなくこのバックエンド側。フォルダは `appsettings.json` の `Storage:DicomRoot` で変更可能）
+2. `user_study` / `user_series` / `user_sop` に該当行が無ければ作成（UIDで存在確認するupsert）
+
+を行う。GraphQLではなく素のHTTP POSTにしているのは、バイナリファイルのアップロードは
+GraphQLのmultipart request spec対応が別途必要になり、シンプルなREST APIの方が学習コストが低いため。
+
+同じSOP Instance UIDのファイルは重複登録を避けるためスキップされる（`DicomUploadResult.success = false`
++ 理由がmessageに入って返る）。フロントエンドの実装は `frontend/src/services/uploadService.ts` と
+`frontend/src/views/UploadView.vue` を参照。
 
 DICOMファイルの階層構造（Study > Series > Instance）は `frontend/src/types/dicom.ts` と同じ考え方です。
 `Models/` 配下の3つのクラスはTypeScript側の対応する型と見比べてみると理解しやすいはずです。

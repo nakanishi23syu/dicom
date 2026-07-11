@@ -11,6 +11,8 @@ Vue 3 + TypeScript 製の DICOM ビューアです。
 - **検査一覧テーブル** — `public/dicom/` 内の DICOM ファイルを読み込み、検査単位で一覧表示
 - **シリーズ情報ポップアップ** — 検査行をクリックするとシリーズ一覧が表示
 - **画像ビューア** — シリーズをダブルクリックするとピクセルデータを含む画像が一覧表示
+- **DICOMアップロード**（`/upload`） — ドラッグ&ドロップ（ファイル/フォルダ）・ファイル選択・フォルダ選択で
+  DICOMファイルをbackendへ送信。解析・保存はすべてbackend側で行う（下記参照）
 
 ## 技術スタック
 
@@ -99,7 +101,9 @@ frontend/
 │   ├── services/
 │   │   ├── dicomService.ts      # dicom.tsライブラリとの通信（Vue に依存しない純粋関数）
 │   │   ├── graphqlClient.ts     # backend GraphQL への汎用リクエスト関数
-│   │   └── backendApiService.ts # backend GraphQL の個別クエリ・ミューテーション
+│   │   ├── backendApiService.ts # backend GraphQL の個別クエリ・ミューテーション
+│   │   ├── uploadService.ts     # backend への DICOM ファイルアップロード（REST）
+│   │   └── fileDropService.ts   # ドラッグ&ドロップされたファイル/フォルダの再帰的な収集
 │   ├── stores/
 │   │   └── dicomStore.ts        # グローバル状態管理（Pinia）
 │   ├── types/
@@ -161,6 +165,23 @@ composableとして共通化している。
 使用例は `src/features/tutorial/components/DragSortUnit.vue`
 （Vue学習チュートリアルの「Notion風ドラッグ&ドロップ並べ替え」単元）で、
 backendの実データを使って検査→シリーズ→SOPの3階層すべてを実際に動かしながら確認できる。
+
+## DICOMアップロード（`/upload`, `src/views/UploadView.vue`）
+
+DICOM画像本体は Vue 側ではなく **backend側のストレージフォルダ** にのみ保存する方針（`backend/README.md` 参照）。
+このページの役割はファイルを集めて `POST /api/dicom-upload` へ送るところまで。
+
+ファイルの選び方は4通り用意している:
+
+| 方法 | 実装 |
+|---|---|
+| ファイルのドラッグ&ドロップ | `dragover`/`drop` + `services/fileDropService.ts` |
+| フォルダのドラッグ&ドロップ | 同上（`DataTransferItem.webkitGetAsEntry()` で再帰的にフォルダの中身を集める） |
+| ファイル選択ボタン | `<input type="file" multiple>` |
+| フォルダ選択ボタン | `<input type="file" webkitdirectory multiple>` |
+
+`services/uploadService.ts` が `FormData` に複数ファイルを詰めて1回のPOSTでまとめて送り、
+backend側はファイルごとの成功/失敗（同一SOP Instance UIDの重複はスキップ等）を返す。
 
 ## ビルド
 

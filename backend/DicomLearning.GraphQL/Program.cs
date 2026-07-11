@@ -1,6 +1,8 @@
 using DicomLearning.GraphQL.Constants;
 using DicomLearning.GraphQL.Data;
 using DicomLearning.GraphQL.GraphQL;
+using DicomLearning.GraphQL.Services;
+using DicomLearning.GraphQL.Configuration;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,6 +14,10 @@ var builder = WebApplication.CreateBuilder(args);
 // AddDbContext は既定で Scoped 登録される＝GraphQLのリクエスト1件ごとに新しいインスタンスが使われる。
 builder.Services.AddDbContext<DicomDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("Dicom")));
+
+// DICOMアップロード機能: 保存先フォルダの設定 + アップロード処理サービス本体。
+builder.Services.Configure<DicomStorageOptions>(builder.Configuration.GetSection("Storage"));
+builder.Services.AddScoped<DicomUploadService>();
 
 // ======================================================
 // CORS設定（フロントエンドからのクロスオリジン通信を許可する）
@@ -59,5 +65,33 @@ using (var scope = app.Services.CreateScope())
 // 開発環境でブラウザから http://localhost:xxxx/graphql を開くと、
 // 「Nitro」というGraphQL用のIDE（クエリを試し打ちできる画面）が表示される。
 app.MapGraphQL();
+
+// ======================================================
+// DICOMアップロード用エンドポイント（REST）
+// ======================================================
+// GraphQLでもファイルアップロード自体は不可能ではないが（multipart request spec）、
+// 素の `multipart/form-data` POSTで十分かつシンプルなため、ここだけ通常のHTTP APIにしている。
+// フロントエンドからは `FormData` に複数ファイルを詰めてPOSTする想定
+// （frontend/src/services/uploadService.ts を参照）。
+app.MapPost("/api/dicom-upload", async (HttpRequest request, DicomUploadService uploadService) =>
+{
+    if (!request.HasFormContentType)
+    {
+        return Results.BadRequest("multipart/form-data 形式で送信してください。");
+    }
+
+    var form = await request.ReadFormAsync();
+    var results = new List<DicomUploadResult>();
+
+    // 1ファイルずつ処理する（DicomUploadService内で毎回SaveChangesしているため、
+    // 同じ検査内の2枚目以降のファイルも正しく親Study/Seriesを見つけられる）。
+    foreach (var file in form.Files)
+    {
+        await using var stream = file.OpenReadStream();
+        results.Add(await uploadService.UploadOneAsync(stream, file.FileName));
+    }
+
+    return Results.Ok(results);
+});
 
 app.Run();

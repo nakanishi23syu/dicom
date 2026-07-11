@@ -26,6 +26,9 @@ backend/**/*.db
 backend/**/*.db-shm
 backend/**/*.db-wal
 
+# アップロードされたDICOMファイルの保存先（アプリデータのため）
+backend/**/Storage/
+
 # OS が自動生成するファイル
 .DS_Store
 Thumbs.db

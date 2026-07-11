@@ -9,3 +9,8 @@
 // .env.development に開発時の既定値を用意しているが、念のためコード側にもフォールバックを持たせる。
 export const GRAPHQL_ENDPOINT =
   import.meta.env.VITE_GRAPHQL_ENDPOINT || 'http://localhost:5030/graphql'
+
+// DICOMアップロード用のREST APIエンドポイント（backend/DicomLearning.GraphQL/Program.cs の
+// `/api/dicom-upload` に対応）。GraphQLエンドポイントと同じホスト・ポートなので、
+// 別の環境変数を増やして値がズレる事故を避けるため、GRAPHQL_ENDPOINTから機械的に導出する。
+export const DICOM_UPLOAD_ENDPOINT = GRAPHQL_ENDPOINT.replace(/\/graphql$/, '/api/dicom-upload')

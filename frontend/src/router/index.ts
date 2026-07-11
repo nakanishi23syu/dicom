@@ -18,6 +18,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 const StudyListView = () => import('@/views/StudyListView.vue')
 const TutorialView = () => import('@/views/TutorialView.vue')
 const SeriesViewerView = () => import('@/views/SeriesViewerView.vue')
+const UploadView = () => import('@/views/UploadView.vue')
 
 // ======================================================
 // ルート定義
@@ -41,6 +42,11 @@ const routes = [
     path: '/viewer/:seriesInstanceUID',
     name: 'series-viewer', // 新しい画像ビューアページ（旧ImageViewer.vueは未使用のまま残置）
     component: SeriesViewerView,
+  },
+  {
+    path: '/upload',
+    name: 'upload', // DICOMアップロードページ（backend/DicomLearning.GraphQL への保存）
+    component: UploadView,
   },
   // 将来の拡張例:
   // {

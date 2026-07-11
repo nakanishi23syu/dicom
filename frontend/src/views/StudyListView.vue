@@ -23,6 +23,7 @@
         <span class="logo-text">DICOM Tool</span>
       </div>
       <div class="header-actions">
+        <RouterLink :to="{ name: 'upload' }" class="tutorial-link">⬆ アップロード</RouterLink>
         <RouterLink :to="{ name: 'tutorial' }" class="tutorial-link">📘 Vue学習</RouterLink>
         <button class="refresh-btn" :disabled="store.loading" @click="store.fetchStudies()">
           <span :class="{ spinning: store.loading }">↻</span>
