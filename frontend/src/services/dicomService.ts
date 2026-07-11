@@ -72,6 +72,26 @@ function firstTagValue(image: ReturnType<typeof dicomts.parseImage>, tag: [numbe
 }
 
 // ======================================================
+// normalizeStudyDate — 検査日を必ず "YYYYMMDD" 形式の文字列に揃える
+// ======================================================
+// DicomStudy.studyDate の型は string だが、dicom.ts の image.studyDate は
+// 実行時には Date オブジェクトで返ってくることがある（DICOMのDA型VRをパースした結果）。
+// 文字列を期待する側（StudyTable.vue の formatDate、useFilterSort.ts のフィルター/ソート）が
+// Dateオブジェクトを渡されると壊れる（例: date.localeCompareは存在せず例外になる）ため、
+// データを取り込む時点でここで文字列に統一しておく。
+function normalizeStudyDate(raw: unknown): string {
+  if (raw instanceof Date) {
+    // Dateはローカルタイムゾーンで構築されている前提のため、ローカル時刻のgetterで取り出す
+    // （getUTCFullYear等を使うとタイムゾーンによって日付がずれる）。
+    const year = raw.getFullYear()
+    const month = String(raw.getMonth() + 1).padStart(2, '0')
+    const day = String(raw.getDate()).padStart(2, '0')
+    return `${year}${month}${day}`
+  }
+  return typeof raw === 'string' ? raw : ''
+}
+
+// ======================================================
 // loadAllStudies — manifest の全ファイルを解析して Study 構造に変換する
 // ======================================================
 // DICOM の1ファイル = 1インスタンス（画像1枚）。
@@ -109,7 +129,7 @@ export async function loadAllStudies(): Promise<DicomStudy[]> {
         studyInstanceUID: studyUID,
         patientName: image.patientName ?? '',
         patientID: image.patientID ?? '',
-        studyDate: image.studyDate ?? '',
+        studyDate: normalizeStudyDate(image.studyDate),
         studyDescription: studyDesc,
         modality: image.modality ?? '',
         accessionNumber: accessionNum,

@@ -9,13 +9,76 @@
 <template>
   <div class="study-table-wrap">
     <!--
+      ── Notion風のフィルター・ソートツールバー ──
+      composables/useFilterSort.ts に共通ロジックを持たせ、ここではUIの組み立てだけを行う。
+    -->
+    <div class="filter-sort-toolbar">
+      <div class="toolbar-buttons">
+        <BaseButton variant="secondary" @click="showFilterPanel = !showFilterPanel">
+          🔍 フィルター<span v-if="filterRules.length">（{{ filterRules.length }}）</span>
+        </BaseButton>
+        <BaseButton variant="secondary" @click="showSortPanel = !showSortPanel">
+          ↕ 並び替え<span v-if="sortRules.length">（{{ sortRules.length }}）</span>
+        </BaseButton>
+      </div>
+
+      <!-- フィルターパネル: 条件を1つずつ「項目・演算子・値」の3点セットで積み重ねる -->
+      <div v-if="showFilterPanel" class="rule-panel filter-panel">
+        <div v-for="rule in filterRules" :key="rule.id" class="rule-row">
+          <select v-model="rule.field" class="rule-select" @change="onFilterFieldChange(rule)">
+            <option v-for="f in FILTER_FIELDS" :key="f" :value="f">{{ FIELD_LABELS[f] }}</option>
+          </select>
+          <select v-model="rule.operator" class="rule-select">
+            <option v-for="op in operatorsForField(rule.field)" :key="op" :value="op">
+              {{ OPERATOR_LABELS[op] }}
+            </option>
+          </select>
+          <input
+            v-if="operatorNeedsValue(rule.operator) && rule.field !== 'studyDate'"
+            v-model="rule.value"
+            class="rule-value"
+            type="text"
+            placeholder="値を入力"
+          />
+          <input
+            v-else-if="operatorNeedsValue(rule.operator)"
+            class="rule-value"
+            type="date"
+            :value="toInputDate(rule.value)"
+            @input="rule.value = fromInputDate(($event.target as HTMLInputElement).value)"
+          />
+          <button class="rule-remove" aria-label="削除" @click="removeFilterRule(rule.id)">
+            ✕
+          </button>
+        </div>
+        <button class="rule-add" @click="addFilterRule('patientName')">+ フィルターを追加</button>
+      </div>
+
+      <!-- 並び替えパネル: 上から順に優先される（1段目が同値のときだけ2段目を見る） -->
+      <div v-if="showSortPanel" class="rule-panel sort-panel">
+        <div v-for="rule in sortRules" :key="rule.id" class="rule-row">
+          <select v-model="rule.field" class="rule-select">
+            <option v-for="f in FILTER_FIELDS" :key="f" :value="f">{{ FIELD_LABELS[f] }}</option>
+          </select>
+          <select v-model="rule.direction" class="rule-select">
+            <option value="asc">昇順</option>
+            <option value="desc">降順</option>
+          </select>
+          <button class="rule-remove" aria-label="削除" @click="removeSortRule(rule.id)">✕</button>
+        </div>
+        <button class="rule-add" @click="addSortRule('studyDate')">+ 並び替えを追加</button>
+      </div>
+    </div>
+
+    <!--
       【v-if / v-else-if / v-else】 条件分岐レンダリング
       上から順に評価され、最初に true になったものだけが表示される。
-      4つの状態を切り替えている:
-        1. loading が true  → スピナー表示
-        2. error がある     → エラーメッセージ表示
-        3. 件数がゼロ       → 空メッセージ表示
-        4. それ以外         → テーブル表示
+      5つの状態を切り替えている:
+        1. loading が true          → スピナー表示
+        2. error がある              → エラーメッセージ表示
+        3. 元データが0件             → 空メッセージ表示
+        4. フィルター後が0件         → フィルター起因の空メッセージ表示
+        5. それ以外                  → テーブル表示
     -->
 
     <!-- ① 読み込み中 -->
@@ -27,13 +90,18 @@
     <!-- ② エラーあり（error が null でない場合） -->
     <div v-else-if="error" class="state-msg error">{{ error }}</div>
 
-    <!-- ③ データなし -->
+    <!-- ③ 元データなし -->
     <div v-else-if="studies.length === 0" class="state-msg">
       <p>DICOMファイルがありません。</p>
       <p class="hint">public/dicom/ にファイルを配置し、manifest.json に追記してください。</p>
     </div>
 
-    <!-- ④ データあり → テーブルを描画 -->
+    <!-- ④ フィルター条件に一致する検査が0件 -->
+    <div v-else-if="filteredSortedStudies.length === 0" class="state-msg">
+      <p>フィルター条件に一致する検査がありません。</p>
+    </div>
+
+    <!-- ⑤ データあり → テーブルを描画 -->
     <table v-else class="study-table">
       <thead>
         <tr>
@@ -67,7 +135,7 @@
           親（App.vue）の @select-study="onSelectStudy" が受け取る。
         -->
         <tr
-          v-for="study in studies"
+          v-for="study in filteredSortedStudies"
           :key="study.studyInstanceUID"
           class="study-row"
           :class="{ selected: selectedUID === study.studyInstanceUID }"
@@ -97,7 +165,15 @@
 </template>
 
 <script setup lang="ts">
+import { ref, toRef } from 'vue'
 import type { DicomStudy } from '@/types/dicom'
+import BaseButton from '@/components/common/BaseButton.vue'
+import {
+  useFilterSort,
+  operatorNeedsValue,
+  type FilterOperator,
+  type FilterRule,
+} from '@/composables/useFilterSort'
 
 // ======================================================
 // defineProps — 親から受け取るプロパティの定義
@@ -105,7 +181,7 @@ import type { DicomStudy } from '@/types/dicom'
 // Props（プロパティ）は親コンポーネントから子へデータを渡す仕組み。
 // 子は受け取るだけで直接書き換えてはいけない（単方向データフロー）。
 // TypeScript のジェネリクス構文 <{ ... }> で型を定義する。
-defineProps<{
+const props = defineProps<{
   studies: DicomStudy[] // 検査の配列
   loading: boolean // 読み込み中フラグ
   error: string | null // エラーメッセージ（なければ null）
@@ -133,6 +209,89 @@ function formatDate(raw: string): string {
   // "20240315" → "2024/03/15"
   return `${raw.slice(0, 4)}/${raw.slice(4, 6)}/${raw.slice(6, 8)}`
 }
+
+// ======================================================
+// Notion風フィルター・ソート（useFilterSort.ts を検査一覧向けに使う）
+// ======================================================
+type StudyFilterField =
+  | 'patientName'
+  | 'patientID'
+  | 'studyDate'
+  | 'studyDescription'
+  | 'modality'
+  | 'accessionNumber'
+
+const FILTER_FIELDS: StudyFilterField[] = [
+  'patientName',
+  'patientID',
+  'studyDate',
+  'studyDescription',
+  'modality',
+  'accessionNumber',
+]
+
+const FIELD_LABELS: Record<StudyFilterField, string> = {
+  patientName: '患者名',
+  patientID: '患者ID',
+  studyDate: '検査日',
+  studyDescription: '検査説明',
+  modality: 'モダリティ',
+  accessionNumber: 'アクセッション番号',
+}
+
+const OPERATOR_LABELS: Record<FilterOperator, string> = {
+  contains: '含む',
+  notContains: '含まない',
+  equals: 'と等しい',
+  isEmpty: '空である',
+  isNotEmpty: '空でない',
+  onOrAfter: '以降',
+  onOrBefore: '以前',
+}
+
+// 検査日は「以降/以前」中心、それ以外の文字列項目は「含む/含まない」中心にする
+// （日付に「含む」を出しても使いどころが無いため、項目ごとに選択肢を絞る）。
+function operatorsForField(field: StudyFilterField): FilterOperator[] {
+  if (field === 'studyDate') {
+    return ['onOrAfter', 'onOrBefore', 'equals', 'isEmpty', 'isNotEmpty']
+  }
+  return ['contains', 'notContains', 'equals', 'isEmpty', 'isNotEmpty']
+}
+
+// 項目を切り替えたときに、新しい項目で選べない演算子のままにならないよう補正する
+function onFilterFieldChange(rule: FilterRule<StudyFilterField>) {
+  const allowed = operatorsForField(rule.field)
+  if (!allowed.includes(rule.operator)) {
+    rule.operator = allowed[0]
+  }
+}
+
+// "20240315" ⇔ "2024-03-15"（<input type="date"> はハイフン区切りを要求するため相互変換する）
+function toInputDate(dicomDate: string): string {
+  if (dicomDate.length !== 8) return ''
+  return `${dicomDate.slice(0, 4)}-${dicomDate.slice(4, 6)}-${dicomDate.slice(6, 8)}`
+}
+function fromInputDate(inputDate: string): string {
+  // tsconfigのtargetがES2020のためreplaceAllが使えず、split/joinで代用している
+  return inputDate.split('-').join('')
+}
+
+function getFieldValue(study: DicomStudy, field: StudyFilterField): string {
+  return study[field] ?? ''
+}
+
+const {
+  filterRules,
+  sortRules,
+  filteredSortedItems: filteredSortedStudies,
+  addFilterRule,
+  removeFilterRule,
+  addSortRule,
+  removeSortRule,
+} = useFilterSort<DicomStudy, StudyFilterField>(toRef(props, 'studies'), getFieldValue)
+
+const showFilterPanel = ref(false)
+const showSortPanel = ref(false)
 </script>
 
 <!--
@@ -140,6 +299,74 @@ function formatDate(raw: string): string {
   他コンポーネントの同名クラスには影響しない。
 -->
 <style scoped>
+.filter-sort-toolbar {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.toolbar-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.rule-panel {
+  margin-top: 0.6rem;
+  padding: 0.75rem;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.rule-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.rule-select,
+.rule-value {
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 5px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+.rule-value {
+  flex: 1;
+  min-width: 0;
+}
+
+.rule-remove {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.rule-remove:hover {
+  color: var(--color-danger);
+}
+
+.rule-add {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--color-accent);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.2rem 0;
+}
+
+.rule-add:hover {
+  text-decoration: underline;
+}
+
 .study-table-wrap {
   width: 100%;
   overflow-x: auto; /* 画面幅が狭い場合に横スクロール可能にする */

@@ -81,7 +81,8 @@ frontend/
 │   ├── components/
 │   │   └── common/               # どの画面からも使う汎用UI部品（下記参照）
 │   ├── composables/
-│   │   └── useDragSort.ts        # Notion風ドラッグ&ドロップ並べ替えの共通ロジック（下記参照）
+│   │   ├── useDragSort.ts        # Notion風ドラッグ&ドロップ並べ替えの共通ロジック（下記参照）
+│   │   └── useFilterSort.ts      # Notion風フィルター・ソートの共通ロジック（下記参照）
 │   ├── constants/
 │   │   └── env.ts                # .env の値を読む窓口
 │   ├── styles/
@@ -165,6 +166,23 @@ composableとして共通化している。
 使用例は `src/features/tutorial/components/DragSortUnit.vue`
 （Vue学習チュートリアルの「Notion風ドラッグ&ドロップ並べ替え」単元）で、
 backendの実データを使って検査→シリーズ→SOPの3階層すべてを実際に動かしながら確認できる。
+
+## Notion風フィルター・ソート（`src/composables/useFilterSort.ts`）
+
+検査一覧（`StudyTable.vue`）に、Notionのデータベースビューにある「+ フィルターを追加」
+「+ 並び替えを追加」のようなUIを実装している。
+
+- **フィルター**: 項目・演算子（含む/含まない/と等しい/空である/空でない/以降/以前）・値の組み合わせを
+  複数積み重ねられる（すべての条件を満たす行だけ表示＝AND）
+- **並び替え**: 複数段階の並び替えに対応（1段目が同値のときだけ2段目の項目で比較する）
+
+`useFilterSort` は表示対象の型に依存しない汎用ロジックで、値の取り出し方（`getFieldValue`）だけを
+呼び出し側が渡す設計。検査一覧以外の一覧にも転用できる。
+
+> 実装時のハマりどころ: `DicomStudy.studyDate` は型としては `string` だが、`dicom.ts` ライブラリの
+> `image.studyDate` は実行時に `Date` オブジェクトを返すことがあった（型定義と実際の値の不一致）。
+> これによりソート時に `.localeCompare is not a function` で例外が起きたため、
+> `dicomService.ts` の `normalizeStudyDate()` でDICOMデータ取り込み時点で必ず文字列化するよう修正した。
 
 ## DICOMアップロード（`/upload`, `src/views/UploadView.vue`）
 
