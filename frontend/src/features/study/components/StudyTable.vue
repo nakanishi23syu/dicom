@@ -4,12 +4,18 @@
   ======================================================
   親（App.vue）から studies / loading / error / selectedUID を受け取り、
   テーブルとして表示する。行クリックで 'select-study' イベントを親に通知する。
+
+  並べ替え・ソートはNotionのテーブルビューの操作感に合わせている:
+    - 列見出し（カラム名）をクリックするとその列でソートされる（昇順→降順→解除の順に切り替え）
+    - ソートが無効な間は、行の左端のハンドル（⠿）をドラッグして手動で並べ替えられる
+      （ソートが有効な間は表示順がソート結果で決まるため、手動並べ替えはできない。
+      Notion本体も同じ仕様）
 -->
 
 <template>
   <div class="study-table-wrap">
     <!--
-      ── Notion風のフィルター・ソートツールバー ──
+      ── Notion風のフィルターツールバー ──
       composables/useFilterSort.ts に共通ロジックを持たせ、ここではUIの組み立てだけを行う。
     -->
     <div class="filter-sort-toolbar">
@@ -17,9 +23,11 @@
         <BaseButton variant="secondary" @click="showFilterPanel = !showFilterPanel">
           🔍 フィルター<span v-if="filterRules.length">（{{ filterRules.length }}）</span>
         </BaseButton>
-        <BaseButton variant="secondary" @click="showSortPanel = !showSortPanel">
-          ↕ 並び替え<span v-if="sortRules.length">（{{ sortRules.length }}）</span>
-        </BaseButton>
+        <span v-if="sort" class="sort-status">
+          ↕ {{ FIELD_LABELS[sort.field] }}で{{ sort.direction === 'asc' ? '昇順' : '降順' }}ソート中
+          <button class="sort-clear" @click="sort = null">解除</button>
+        </span>
+        <span v-else class="sort-hint">列見出しをクリックするとソートできます</span>
       </div>
 
       <!-- フィルターパネル: 条件を1つずつ「項目・演算子・値」の3点セットで積み重ねる -->
@@ -53,21 +61,6 @@
         </div>
         <button class="rule-add" @click="addFilterRule('patientName')">+ フィルターを追加</button>
       </div>
-
-      <!-- 並び替えパネル: 上から順に優先される（1段目が同値のときだけ2段目を見る） -->
-      <div v-if="showSortPanel" class="rule-panel sort-panel">
-        <div v-for="rule in sortRules" :key="rule.id" class="rule-row">
-          <select v-model="rule.field" class="rule-select">
-            <option v-for="f in FILTER_FIELDS" :key="f" :value="f">{{ FIELD_LABELS[f] }}</option>
-          </select>
-          <select v-model="rule.direction" class="rule-select">
-            <option value="asc">昇順</option>
-            <option value="desc">降順</option>
-          </select>
-          <button class="rule-remove" aria-label="削除" @click="removeSortRule(rule.id)">✕</button>
-        </div>
-        <button class="rule-add" @click="addSortRule('studyDate')">+ 並び替えを追加</button>
-      </div>
     </div>
 
     <!--
@@ -97,7 +90,7 @@
     </div>
 
     <!-- ④ フィルター条件に一致する検査が0件 -->
-    <div v-else-if="filteredSortedStudies.length === 0" class="state-msg">
+    <div v-else-if="displayedStudies.length === 0" class="state-msg">
       <p>フィルター条件に一致する検査がありません。</p>
     </div>
 
@@ -105,13 +98,30 @@
     <table v-else class="study-table">
       <thead>
         <tr>
-          <th>患者ID</th>
+          <!-- ドラッグハンドル用の空列 -->
+          <th class="drag-col" />
+          <th class="sortable" @click="toggleSort('patientID')">
+            患者ID
+            <span v-if="sort?.field === 'patientID'" class="sort-arrow">{{ sortArrow }}</span>
+          </th>
           <th>読影ステータス</th>
-          <th>患者氏名</th>
-          <th>検査日時</th>
-          <th>代表モダリティ</th>
+          <th class="sortable" @click="toggleSort('patientName')">
+            患者氏名
+            <span v-if="sort?.field === 'patientName'" class="sort-arrow">{{ sortArrow }}</span>
+          </th>
+          <th class="sortable" @click="toggleSort('studyDate')">
+            検査日時
+            <span v-if="sort?.field === 'studyDate'" class="sort-arrow">{{ sortArrow }}</span>
+          </th>
+          <th class="sortable" @click="toggleSort('modality')">
+            代表モダリティ
+            <span v-if="sort?.field === 'modality'" class="sort-arrow">{{ sortArrow }}</span>
+          </th>
           <th>全検査部位</th>
-          <th>検査記述</th>
+          <th class="sortable" @click="toggleSort('studyDescription')">
+            検査記述
+            <span v-if="sort?.field === 'studyDescription'" class="sort-arrow">{{ sortArrow }}</span>
+          </th>
           <th>シリーズ数</th>
           <th>タイムライン</th>
         </tr>
@@ -119,7 +129,7 @@
       <tbody>
         <!--
           【v-for】 リストレンダリング
-          studies 配列の要素を1つずつ study という変数で受け取り、
+          displayedStudies 配列の要素を1つずつ study という変数で受け取り、
           <tr> を繰り返し生成する。
 
           【:key】 一意のキー（必須）
@@ -137,12 +147,22 @@
           親（App.vue）の @select-study="onSelectStudy" が受け取る。
         -->
         <tr
-          v-for="study in filteredSortedStudies"
+          v-for="(study, index) in displayedStudies"
           :key="study.studyInstanceUID"
           class="study-row"
-          :class="{ selected: selectedUID === study.studyInstanceUID }"
+          :class="{
+            selected: selectedUID === study.studyInstanceUID,
+            dragging: !sort && draggingIndex === index,
+          }"
+          v-bind="!sort ? dragHandlers(index) : {}"
           @click="$emit('select-study', study)"
         >
+          <!-- ソート中はドラッグでの手動並べ替えができないため、ハンドルを薄く表示するだけにする -->
+          <td class="drag-col" :class="{ 'drag-disabled': !!sort }" @click.stop>
+            <span class="drag-handle" :title="sort ? 'ソート解除で手動並べ替え可能' : 'ドラッグで並べ替え'">
+              ⠿
+            </span>
+          </td>
           <!--
             【|| '—'】 フォールバック
             値が空文字・null・undefined の場合にダッシュ（—）を表示する。
@@ -190,11 +210,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef } from 'vue'
+import { ref, toRef, computed, watch } from 'vue'
 import type { DicomStudy } from '@/types/dicom'
 import BaseButton from '@/components/common/BaseButton.vue'
 import ReadingStatusBadge from './ReadingStatusBadge.vue'
 import { useReadingStatus } from '@/composables/useReadingStatus'
+import { useDragSort } from '@/composables/useDragSort'
+import { useManualOrder } from '@/composables/useManualOrder'
 import {
   useFilterSort,
   operatorNeedsValue,
@@ -258,11 +280,11 @@ const FILTER_FIELDS: StudyFilterField[] = [
 ]
 
 const FIELD_LABELS: Record<StudyFilterField, string> = {
-  patientName: '患者名',
+  patientName: '患者氏名',
   patientID: '患者ID',
-  studyDate: '検査日',
-  studyDescription: '検査説明',
-  modality: 'モダリティ',
+  studyDate: '検査日時',
+  studyDescription: '検査記述',
+  modality: '代表モダリティ',
   accessionNumber: 'アクセッション番号',
 }
 
@@ -316,18 +338,42 @@ function allBodyParts(study: DicomStudy): string {
 
 const { getStatus, setStatus } = useReadingStatus()
 
-const {
-  filterRules,
-  sortRules,
-  filteredSortedItems: filteredSortedStudies,
-  addFilterRule,
-  removeFilterRule,
-  addSortRule,
-  removeSortRule,
-} = useFilterSort<DicomStudy, StudyFilterField>(toRef(props, 'studies'), getFieldValue)
+const { filterRules, sort, filteredItems, filteredSortedItems, addFilterRule, removeFilterRule, toggleSort } =
+  useFilterSort<DicomStudy, StudyFilterField>(toRef(props, 'studies'), getFieldValue)
 
 const showFilterPanel = ref(false)
-const showSortPanel = ref(false)
+
+const sortArrow = computed(() => (sort.value?.direction === 'asc' ? '▲' : '▼'))
+
+// ======================================================
+// Notion風ドラッグ&ドロップでの手動並べ替え
+// ======================================================
+// ソートが有効な間は表示順がソート結果で決まるため、手動並べ替えの対象にはしない
+// （Notion本体も同じ挙動）。ソートが無効なときだけ、フィルター後の一覧を
+// 「保存済みの手動順」で並べ、ドラッグで並べ替えられるようにする。
+const { applyManualOrder, setOrder } = useManualOrder('study-list')
+
+// useDragSortが直接書き換えられるよう、実体を持つrefとして持つ
+// （filteredSortedItems等のcomputedは読み取り専用のため直接は使えない）。
+const manualOrderedStudies = ref<DicomStudy[]>([])
+
+watch(
+  filteredItems,
+  (items) => {
+    manualOrderedStudies.value = applyManualOrder(items, (s) => s.studyInstanceUID)
+  },
+  { immediate: true }
+)
+
+const { draggingIndex, dragHandlers } = useDragSort(manualOrderedStudies)
+
+// ドラッグでの並べ替え結果が変わるたびに保存する（ソート中はドラッグ自体が無効なので発火しない）。
+watch(manualOrderedStudies, (items) => {
+  setOrder(items, (s) => s.studyInstanceUID)
+})
+
+// 実際にテーブルへ描画する一覧: ソート中はソート結果、そうでなければ手動並び順。
+const displayedStudies = computed(() => (sort.value ? filteredSortedItems.value : manualOrderedStudies.value))
 </script>
 
 <!--
@@ -342,7 +388,31 @@ const showSortPanel = ref(false)
 
 .toolbar-buttons {
   display: flex;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.sort-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--color-accent);
+}
+
+.sort-clear {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.sort-hint {
+  font-size: 0.76rem;
+  color: var(--color-text-faint);
 }
 
 .rule-panel {
@@ -422,12 +492,42 @@ const showSortPanel = ref(false)
   letter-spacing: 0.05em;
 }
 
+.study-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.study-table th.sortable:hover {
+  color: var(--color-accent);
+}
+
+.sort-arrow {
+  margin-left: 0.25rem;
+  font-size: 0.65rem;
+}
+
+.drag-col {
+  width: 1.5rem;
+  padding-left: 0.75rem !important;
+  padding-right: 0 !important;
+}
+
 .study-table th,
 .study-table td {
   padding: 0.625rem 1rem;
   text-align: left;
   border-bottom: 1px solid var(--color-border);
   white-space: nowrap; /* セル内のテキストを折り返さない */
+}
+
+.drag-handle {
+  color: var(--color-text-faint);
+  cursor: grab;
+}
+
+.drag-col.drag-disabled .drag-handle {
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
 }
 
 .study-row {
@@ -439,6 +539,11 @@ const showSortPanel = ref(false)
 
 .study-row:hover {
   background: var(--color-thumbnail-selected-bg);
+}
+
+/* ドラッグ中の行は半透明にして「今つまんでいる」ことを視覚的に示す（DragSortUnit.vueと同じ表現） */
+.study-row.dragging {
+  opacity: 0.4;
 }
 
 /* v-if で動的に付与されるクラス: 選択中の行を強調表示 */

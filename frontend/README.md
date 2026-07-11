@@ -91,6 +91,7 @@ frontend/
 │   │   └── common/               # どの画面からも使う汎用UI部品（下記参照）
 │   ├── composables/
 │   │   ├── useDragSort.ts        # Notion風ドラッグ&ドロップ並べ替えの共通ロジック（下記参照）
+│   │   ├── useManualOrder.ts     # ドラッグ結果の手動並び順をlocalStorageへ保存・復元
 │   │   ├── useFilterSort.ts      # Notion風フィルター・ソートの共通ロジック（下記参照）
 │   │   └── useReadingStatus.ts   # 読影ステータス（未記入/記入中/一時保存/最終確定）の管理
 │   ├── constants/
@@ -168,27 +169,33 @@ frontend/
 新しい色を使いたくなったら、まず `theme.css` に該当する変数があるか確認し、無ければ追加してから使うこと。
 各変数の意味は `theme.css` 内のコメントを参照（CSS初心者向けに詳しく解説している）。
 
-## Notion風ドラッグ&ドロップ並べ替え（`src/composables/useDragSort.ts`）
+## Notion風ドラッグ&ドロップ並べ替え（`src/composables/useDragSort.ts`, `useManualOrder.ts`）
 
-検査一覧・シリーズ一覧・SOP（画像）一覧の3箇所で必要な「ドラッグして並べ替える」処理を、
-ライブラリを使わずブラウザ標準の `draggable` 属性 + dragstart/dragover/dropイベントだけで実装し、
-composableとして共通化している。
+Notionのテーブルビューの操作感（列見出しクリックでソート、ソート未適用時は行をドラッグして
+手動並べ替え）に合わせている。検査一覧（`StudyTable.vue`）で実際に動く形で実装済み。
 
-- 並べ替え後、**並べ替え保存** ボタンで backend の `Order` カラムに反映（`reorderStudies`等のMutation）
-- **並べ替え適用** ボタンで、保存済みの `order` 値を使って表示順を並べ直す
+- **ドラッグ&ドロップ**: 各行左端のハンドル（⠿）をドラッグすると順番を入れ替えられる
+  （`useDragSort.ts`。ライブラリを使わずブラウザ標準の`draggable`属性 +
+  dragstart/dragover/dropイベントだけで実装）。結果は`useManualOrder.ts`がlocalStorageに保存し、
+  リロードしても順番が保持される
+- **手動並べ替えとソートの関係**: 列ソートが有効な間は表示順がソート結果で決まるため、
+  ドラッグでの手動並べ替えはできない（ハンドルが淡色表示になる）。これはNotion本体と同じ仕様
 
-使用例は `src/features/tutorial/components/DragSortUnit.vue`
-（Vue学習チュートリアルの「Notion風ドラッグ&ドロップ並べ替え」単元）で、
-backendの実データを使って検査→シリーズ→SOPの3階層すべてを実際に動かしながら確認できる。
+`useDragSort` は表示対象の型に依存しない汎用ロジックで、`Ref<T[]>` さえ渡せば
+検査一覧以外（シリーズ一覧・SOP一覧等）にも使い回せる。backendへの永続化を伴う並べ替えの例は
+`src/features/tutorial/components/DragSortUnit.vue`
+（Vue学習チュートリアルの「Notion風ドラッグ&ドロップ並べ替え」単元、`reorderStudies`等のMutationを使用）
+を参照。
 
 ## Notion風フィルター・ソート（`src/composables/useFilterSort.ts`）
 
-検査一覧（`StudyTable.vue`）に、Notionのデータベースビューにある「+ フィルターを追加」
-「+ 並び替えを追加」のようなUIを実装している。
+検査一覧（`StudyTable.vue`）に、Notionのデータベースビューのようなフィルター・ソートUIを実装している。
 
-- **フィルター**: 項目・演算子（含む/含まない/と等しい/空である/空でない/以降/以前）・値の組み合わせを
-  複数積み重ねられる（すべての条件を満たす行だけ表示＝AND）
-- **並び替え**: 複数段階の並び替えに対応（1段目が同値のときだけ2段目の項目で比較する）
+- **フィルター**: 「+ フィルターを追加」から、項目・演算子（含む/含まない/と等しい/空である/空でない/
+  以降/以前）・値の組み合わせを複数積み重ねられる（すべての条件を満たす行だけ表示＝AND）
+- **ソート**: 列見出し（カラム名）をクリックすると、その列で昇順ソート → もう一度クリックで降順 →
+  もう一度クリックでソート解除、の順に切り替わる（表計算ソフトでよくある操作方式）。
+  一度に有効になるソート列は1つだけ
 
 `useFilterSort` は表示対象の型に依存しない汎用ロジックで、値の取り出し方（`getFieldValue`）だけを
 呼び出し側が渡す設計。検査一覧以外の一覧にも転用できる。

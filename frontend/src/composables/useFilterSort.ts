@@ -1,9 +1,16 @@
 // ======================================================
 // composables/useFilterSort.ts — Notion風のフィルター・ソートの共通ロジック
 // ======================================================
-// Notionのデータベースビューにある「+ フィルターを追加」「+ 並び替えを追加」のように、
-// 複数のフィルター条件（すべて満たすものだけ表示＝AND）と、
-// 複数段階の並び替え（1つ目の項目が同値の場合だけ2つ目の項目で比較）を組み立てられる。
+// Notionのデータベースビューにある「+ フィルターを追加」のように、
+// 複数のフィルター条件（すべて満たすものだけ表示＝AND）を組み立てられる。
+//
+// ソートは「カラム名（列見出し）をクリックすると昇順→降順→ソート解除の順に切り替わる」
+// という、表計算ソフトや多くのテーブルUIで一般的な操作方式にしている
+// （以前は「+ 並び替えを追加」で複数条件を積み重ねる方式だったが、
+// 「ソートはカラム名をクリックで」という要望に合わせて1カラムだけを対象にする方式へ変更した）。
+// ソートが有効な間は表示順がソート結果で決まるため、ドラッグ&ドロップでの手動並べ替えは
+// 意味を持たない（Notion本体もソート適用中は手動ドラッグ並べ替えができない）。
+// 手動並べ替えは呼び出し側で composables/useDragSort.ts と組み合わせて実装する。
 //
 // 特定の画面に依存しない汎用ロジックとして、フィールドの値の取り出し方（getFieldValue）だけを
 // 呼び出し側から渡してもらう設計にしている（検査一覧以外の一覧にも将来転用できる）。
@@ -33,10 +40,11 @@ export interface FilterRule<TField extends string> {
   value: string
 }
 
-export interface SortRule<TField extends string> {
-  id: string
+export type SortDirection = 'asc' | 'desc'
+
+export interface SortState<TField extends string> {
   field: TField
-  direction: 'asc' | 'desc'
+  direction: SortDirection
 }
 
 let ruleIdCounter = 0
@@ -72,32 +80,30 @@ export function useFilterSort<T, TField extends string>(
   getFieldValue: (item: T, field: TField) => string
 ) {
   const filterRules = ref<FilterRule<TField>[]>([]) as Ref<FilterRule<TField>[]>
-  const sortRules = ref<SortRule<TField>[]>([]) as Ref<SortRule<TField>[]>
+  // 現在ソート中のカラム。nullなら「ソートなし」（＝手動並べ替え順が有効）。
+  const sort = ref<SortState<TField> | null>(null) as Ref<SortState<TField> | null>
 
-  const filteredSortedItems = computed<T[]>(() => {
-    // ── フィルター（すべての条件を満たす行だけ残す＝AND） ──
-    let result = items.value.filter((item) =>
+  // フィルターだけを適用した結果（並べ替えは含まない）。
+  // 手動ドラッグ並べ替え用の元データとして呼び出し側に公開する。
+  const filteredItems = computed<T[]>(() =>
+    items.value.filter((item) =>
       filterRules.value.every((rule) => matchesRule(getFieldValue(item, rule.field), rule))
     )
+  )
 
-    // ── 並び替え（1段階目が同値のときだけ2段階目を見る） ──
-    if (sortRules.value.length > 0) {
-      result = [...result].sort((a, b) => {
-        for (const rule of sortRules.value) {
-          // getFieldValue は呼び出し側の実装次第で文字列以外（例: 数値、Dateから変換し忘れた値）を
-          // 返してしまう可能性があるため、比較直前にStringで確実に文字列化しておく。
-          const av = String(getFieldValue(a, rule.field))
-          const bv = String(getFieldValue(b, rule.field))
-          const cmp = av.localeCompare(bv, 'ja')
-          if (cmp !== 0) {
-            return rule.direction === 'asc' ? cmp : -cmp
-          }
-        }
-        return 0
-      })
-    }
+  // フィルター＋（ソート中であれば）ソートまで適用した結果。
+  const filteredSortedItems = computed<T[]>(() => {
+    if (!sort.value) return filteredItems.value
 
-    return result
+    const { field, direction } = sort.value
+    return [...filteredItems.value].sort((a, b) => {
+      // getFieldValue は呼び出し側の実装次第で文字列以外（例: 数値、Dateから変換し忘れた値）を
+      // 返してしまう可能性があるため、比較直前にStringで確実に文字列化しておく。
+      const av = String(getFieldValue(a, field))
+      const bv = String(getFieldValue(b, field))
+      const cmp = av.localeCompare(bv, 'ja')
+      return direction === 'asc' ? cmp : -cmp
+    })
   })
 
   function addFilterRule(field: TField) {
@@ -108,31 +114,33 @@ export function useFilterSort<T, TField extends string>(
     filterRules.value = filterRules.value.filter((r) => r.id !== id)
   }
 
-  function addSortRule(field: TField) {
-    sortRules.value = [...sortRules.value, { id: nextRuleId(), field, direction: 'asc' }]
-  }
-
-  function removeSortRule(id: string) {
-    sortRules.value = sortRules.value.filter((r) => r.id !== id)
-  }
-
   function clearFilters() {
     filterRules.value = []
   }
 
-  function clearSort() {
-    sortRules.value = []
+  // ── カラム名クリックでのソート切り替え ──
+  // 1回目のクリック: そのカラムで昇順ソート
+  // 2回目のクリック（同じカラム）: 降順に切り替え
+  // 3回目のクリック（同じカラム）: ソート解除（手動並べ替え順に戻る）
+  // 別のカラムをクリックした場合は、そのカラムの昇順から始める。
+  function toggleSort(field: TField) {
+    if (!sort.value || sort.value.field !== field) {
+      sort.value = { field, direction: 'asc' }
+    } else if (sort.value.direction === 'asc') {
+      sort.value = { field, direction: 'desc' }
+    } else {
+      sort.value = null
+    }
   }
 
   return {
     filterRules,
-    sortRules,
+    sort,
+    filteredItems,
     filteredSortedItems,
     addFilterRule,
     removeFilterRule,
-    addSortRule,
-    removeSortRule,
     clearFilters,
-    clearSort,
+    toggleSort,
   }
 }
