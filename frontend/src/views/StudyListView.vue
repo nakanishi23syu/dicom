@@ -1,21 +1,23 @@
 <!--
   ======================================================
-  views/StudyListView.vue — 検査一覧ページ
+  views/StudyListView.vue — 検査一覧ページ（ワークリスト）
   ======================================================
+  実際のPACS製品「SYNAPSE LEAD」のワークリスト画面の構成に近づけている:
+    - 左サイドバー（検索プリセット / 分類フォルダ）
+    - 明るいテーマ（.theme-light。画像を読影するビューア/タイムラインは暗いテーマのまま）
+    - 検査を選択すると「同一患者IDの全検査」「シリーズリスト」が下に常設表示される
+      （以前はポップアップモーダルだったが、実製品に合わせてインラインパネルに変更した）
+
   【View（ビュー）コンポーネントの役割】
   router/index.ts に登録された「ページ」に対応するコンポーネント。
   以下を担当する:
     1. Store からデータを取得してページに渡す
     2. 各 feature コンポーネントを組み合わせてページを構成する
     3. ページ固有の UI 状態（どの検査が選択されているか等）を管理する
-
-  features/ のコンポーネントはデータの「見た目」を担当するが、
-  View はそれらを「どう配置・連携させるか」を担当する。
-  この分離により features/ のコンポーネントが再利用しやすくなる。
 -->
 
 <template>
-  <div class="page">
+  <div class="page theme-light">
     <!-- ── ヘッダー ───────────────────────────────────── -->
     <header class="page-header">
       <div class="logo">
@@ -23,6 +25,13 @@
         <span class="logo-text">DICOM Tool</span>
       </div>
       <div class="header-actions">
+        <span v-if="store.studies.length > 0" class="study-count">
+          {{ store.studies.length }} 件
+        </span>
+        <label class="auto-refresh">
+          <input v-model="autoRefresh" type="checkbox" />
+          自動更新
+        </label>
         <RouterLink :to="{ name: 'upload' }" class="tutorial-link">⬆ アップロード</RouterLink>
         <RouterLink :to="{ name: 'tutorial' }" class="tutorial-link">📘 Vue学習</RouterLink>
         <button class="refresh-btn" :disabled="store.loading" @click="store.fetchStudies()">
@@ -41,44 +50,51 @@
       </div>
     </header>
 
-    <!-- ── メインコンテンツ ───────────────────────────── -->
-    <main class="page-main">
-      <div class="toolbar">
-        <h1 class="section-title">検査一覧</h1>
-        <span v-if="store.studies.length > 0" class="study-count">
-          {{ store.studies.length }} 件
-        </span>
-      </div>
+    <!-- ── サイドバー + メインコンテンツ ───────────────── -->
+    <div class="page-body">
+      <WorklistSidebar @select-preset="handleSelectPreset" />
 
-      <!--
-        StudyTable は features/study/ のコンポーネント。
-        store から取得したデータを Props として渡す。
-        イベントは View が受け取り、ローカル状態（selectedStudy）を更新する。
-      -->
-      <StudyTable
-        :studies="store.studies"
-        :loading="store.loading"
-        :error="store.error"
-        :selected-u-i-d="selectedStudy?.studyInstanceUID ?? null"
-        @select-study="selectedStudy = $event"
-      />
-    </main>
+      <main class="page-main">
+        <div class="toolbar">
+          <h1 class="section-title">検査一覧</h1>
+        </div>
 
-    <!--
-      モーダルはページ固有の UI なのでここで管理する。
-      selectedStudy が null でなければ SeriesModal を表示する。
-    -->
-    <SeriesModal
-      v-if="selectedStudy"
-      :study="selectedStudy"
-      @close="selectedStudy = null"
-      @open-images="openSeries"
-    />
+        <!--
+          StudyTable は features/study/ のコンポーネント。
+          store から取得したデータを Props として渡す。
+          イベントは View が受け取り、ローカル状態（selectedStudy）を更新する。
+        -->
+        <StudyTable
+          :studies="store.studies"
+          :loading="store.loading"
+          :error="store.error"
+          :selected-u-i-d="selectedStudy?.studyInstanceUID ?? null"
+          @select-study="selectedStudy = $event"
+        />
+
+        <!--
+          検査を選択すると、実製品と同じく下に「同一患者IDの全検査」
+          「シリーズリスト」が常設パネルとして表示される（ポップアップではない）。
+        -->
+        <PatientHistoryPanel
+          v-if="selectedStudy"
+          :studies="store.studies"
+          :selected-study="selectedStudy"
+          @select-study="selectedStudy = $event"
+        />
+        <SeriesListPanel
+          v-if="selectedStudy"
+          :key="selectedStudy.studyInstanceUID"
+          :study="selectedStudy"
+          @open-images="openSeries"
+        />
+      </main>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 // Store から取得（@ エイリアスで src/ からの絶対パス）
@@ -87,9 +103,9 @@ import { useAuthStore } from '@/stores/authStore'
 
 // feature コンポーネント（それぞれ独立した機能モジュール）
 import StudyTable from '@/features/study/components/StudyTable.vue'
-import SeriesModal from '@/features/series/components/SeriesModal.vue'
-// 旧 features/viewer/components/ImageViewer.vue はファイルとして残しているが、
-// 新しい画像ビューア（/viewer/:seriesInstanceUID ページ）に役目を譲ったためここでは参照しない。
+import WorklistSidebar from '@/features/study/components/WorklistSidebar.vue'
+import PatientHistoryPanel from '@/features/study/components/PatientHistoryPanel.vue'
+import SeriesListPanel from '@/features/study/components/SeriesListPanel.vue'
 
 import type { DicomStudy, DicomSeries } from '@/types/dicom'
 
@@ -106,10 +122,36 @@ const authStore = useAuthStore()
 // Store ではなくローカルの ref で管理する。
 const selectedStudy = ref<DicomStudy | null>(null)
 
-// シリーズがダブルクリックされたら、モーダルではなく専用ページへ遷移する。
+// シリーズがダブルクリックされたら、専用の画像ビューアページへ遷移する。
 function openSeries(series: DicomSeries) {
   router.push({ name: 'series-viewer', params: { seriesInstanceUID: series.seriesInstanceUID } })
 }
+
+// サイドバーの「全体」を押したら選択状態をリセットする（見た目だけの他項目は今のところ動作なし）。
+function handleSelectPreset(name: string) {
+  if (name === '全体') {
+    selectedStudy.value = null
+  }
+}
+
+// ── 自動更新（実製品のワークリストにある「自動更新」トグルを再現）──────
+// ONの間、一定間隔でfetchStudies()を呼び直す。
+const autoRefresh = ref(false)
+let autoRefreshTimer: ReturnType<typeof setInterval> | null = null
+
+watch(autoRefresh, (enabled) => {
+  if (autoRefreshTimer) {
+    clearInterval(autoRefreshTimer)
+    autoRefreshTimer = null
+  }
+  if (enabled) {
+    autoRefreshTimer = setInterval(() => store.fetchStudies(), 30_000)
+  }
+})
+
+onUnmounted(() => {
+  if (autoRefreshTimer) clearInterval(autoRefreshTimer)
+})
 
 // ── ライフサイクルフック ──────────────────────────────
 // ページが表示されたら自動的に DICOM データを読み込む
@@ -121,6 +163,7 @@ onMounted(() => store.fetchStudies())
   height: 100vh;
   display: flex;
   flex-direction: column;
+  background: var(--color-bg);
 }
 
 .page-header {
@@ -156,6 +199,16 @@ onMounted(() => store.fetchStudies())
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.auto-refresh {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  margin-right: 0.25rem;
 }
 
 .tutorial-link {
@@ -239,6 +292,12 @@ onMounted(() => store.fetchStudies())
   to {
     transform: rotate(360deg);
   }
+}
+
+.page-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
 }
 
 .page-main {

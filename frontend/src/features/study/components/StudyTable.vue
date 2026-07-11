@@ -105,12 +105,13 @@
     <table v-else class="study-table">
       <thead>
         <tr>
-          <th>患者名</th>
           <th>患者ID</th>
-          <th>検査日</th>
-          <th>検査説明</th>
-          <th>モダリティ</th>
-          <th>アクセッション番号</th>
+          <th>読影ステータス</th>
+          <th>患者氏名</th>
+          <th>検査日時</th>
+          <th>代表モダリティ</th>
+          <th>全検査部位</th>
+          <th>検査記述</th>
           <th>シリーズ数</th>
           <th>タイムライン</th>
         </tr>
@@ -146,18 +147,26 @@
             【|| '—'】 フォールバック
             値が空文字・null・undefined の場合にダッシュ（—）を表示する。
           -->
-          <td>{{ study.patientName || '—' }}</td>
           <td>{{ study.patientID || '—' }}</td>
+          <td>
+            <!-- ステータスのクリックが行選択（select-study）に伝播しないよう@click.stopで止める -->
+            <ReadingStatusBadge
+              :status="getStatus(study.studyInstanceUID)"
+              @click.stop
+              @update:status="setStatus(study.studyInstanceUID, $event)"
+            />
+          </td>
+          <td>{{ study.patientName || '—' }}</td>
           <!--
             formatDate() を呼んで YYYYMMDD → YYYY/MM/DD に整形する。
             テンプレート内でも関数呼び出しができる。
           -->
           <td>{{ formatDate(study.studyDate) }}</td>
-          <td>{{ study.studyDescription || '—' }}</td>
           <td>
             <span class="badge">{{ study.modality || '—' }}</span>
           </td>
-          <td>{{ study.accessionNumber || '—' }}</td>
+          <td>{{ allBodyParts(study) }}</td>
+          <td>{{ study.studyDescription || '—' }}</td>
           <td>{{ study.series.length }}</td>
           <td>
             <!--
@@ -184,6 +193,8 @@
 import { ref, toRef } from 'vue'
 import type { DicomStudy } from '@/types/dicom'
 import BaseButton from '@/components/common/BaseButton.vue'
+import ReadingStatusBadge from './ReadingStatusBadge.vue'
+import { useReadingStatus } from '@/composables/useReadingStatus'
 import {
   useFilterSort,
   operatorNeedsValue,
@@ -295,6 +306,15 @@ function fromInputDate(inputDate: string): string {
 function getFieldValue(study: DicomStudy, field: StudyFilterField): string {
   return study[field] ?? ''
 }
+
+// このプロジェクトのDicomStudyには「検査部位」そのものを持つ項目が無いため、
+// 含まれるシリーズの説明（PLAIN、造影後 等）から重複を除いて簡易的に「全検査部位」を組み立てる。
+function allBodyParts(study: DicomStudy): string {
+  const parts = [...new Set(study.series.map((s) => s.seriesDescription).filter(Boolean))]
+  return parts.length > 0 ? parts.join(' / ') : '—'
+}
+
+const { getStatus, setStatus } = useReadingStatus()
 
 const {
   filterRules,
@@ -413,6 +433,7 @@ const showSortPanel = ref(false)
 .study-row {
   cursor: pointer; /* クリック可能であることをマウスカーソルで示す */
   color: var(--color-text);
+  background: var(--color-surface); /* 明示しないと親要素の背景が透けて見えてしまうため指定する */
   transition: background 0.15s; /* ホバー時の背景色変化をなめらかにする */
 }
 

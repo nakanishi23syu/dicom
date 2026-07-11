@@ -8,8 +8,13 @@ Vue 3 + TypeScript 製の DICOM ビューアです。
 
 ## 機能
 
-- **検査一覧テーブル** — `public/dicom/` 内の DICOM ファイルを読み込み、検査単位で一覧表示
-- **シリーズ情報ポップアップ** — 検査行をクリックするとシリーズ一覧が表示
+実在するPACS製品「[SYNAPSE LEAD](https://www.fujifilm.com/jp/ja/healthcare/healthcare-it/it-imaging/synapse-lead)」の
+画面キャプチャを参考に、ワークリスト（検査一覧）・タイムラインの構成を似せている（詳細は下記「実製品を参考にした画面構成」参照）。
+
+- **検査一覧（ワークリスト）** — `public/dicom/` 内の DICOM ファイルを読み込み、検査単位で一覧表示。
+  左サイドバー、読影ステータスバッジ付き
+- **同一患者IDの全検査 / シリーズリスト**（インラインパネル） — 検査行を選択すると下に常設表示。
+  シリーズを選択するとサムネイルを表示、ダブルクリックで画像ビューアを開く
 - **画像ビューア** — シリーズをダブルクリックするとピクセルデータを含む画像が一覧表示
 - **DICOMアップロード**（`/upload`） — ドラッグ&ドロップ（ファイル/フォルダ）・ファイル選択・フォルダ選択で
   DICOMファイルをbackendへ送信。解析・保存はすべてbackend側で行う（下記参照）
@@ -86,18 +91,20 @@ frontend/
 │   │   └── common/               # どの画面からも使う汎用UI部品（下記参照）
 │   ├── composables/
 │   │   ├── useDragSort.ts        # Notion風ドラッグ&ドロップ並べ替えの共通ロジック（下記参照）
-│   │   └── useFilterSort.ts      # Notion風フィルター・ソートの共通ロジック（下記参照）
+│   │   ├── useFilterSort.ts      # Notion風フィルター・ソートの共通ロジック（下記参照）
+│   │   └── useReadingStatus.ts   # 読影ステータス（未記入/記入中/一時保存/最終確定）の管理
 │   ├── constants/
 │   │   └── env.ts                # .env の値を読む窓口
 │   ├── styles/
-│   │   └── theme.css             # カラーテーマ用のCSS変数定義（下記参照）
+│   │   └── theme.css             # カラーテーマ用のCSS変数定義（.theme-light含む。下記参照）
 │   ├── features/                # 機能単位のモジュール
 │   │   ├── study/
 │   │   │   └── components/
-│   │   │       └── StudyTable.vue    # 検査一覧テーブル
-│   │   ├── series/
-│   │   │   └── components/
-│   │   │       └── SeriesModal.vue   # シリーズ情報ポップアップ
+│   │   │       ├── StudyTable.vue          # 検査一覧テーブル
+│   │   │       ├── WorklistSidebar.vue     # 左サイドバー（検索プリセット/分類フォルダ）
+│   │   │       ├── ReadingStatusBadge.vue  # 読影ステータスの色付きバッジ
+│   │   │       ├── PatientHistoryPanel.vue # 「同一患者IDの全検査」インラインパネル
+│   │   │       └── SeriesListPanel.vue     # 「シリーズリスト」インラインパネル（サムネイル付き）
 │   │   └── viewer/
 │   │       └── components/
 │   │           └── ImageViewer.vue   # 画像ビューア
@@ -228,13 +235,37 @@ backendの `login` ミューテーションでJWTを取得し、`authStore`（Pi
 ## 患者タイムライン（`/timeline/:patientId`, `src/views/TimelineView.vue`）
 
 関連用語集.md にある「タイムラインビュー」「比較読影」の実装。検査一覧の各行にある
-「🕐 比較読影」リンクから、その患者の過去検査をbackendの `patientTimeline` クエリで取得し、
-新しい順に並べて表示する。隣り合う検査を見比べられるよう、カードの間に比較読影の注記を挟んでいる。
+「🕐 比較読影」リンクから、その患者の過去検査をbackendの `patientTimeline` クエリで取得する。
+SYNAPSE LEADの実際のタイムライン画面（モダリティごとの行×検査日を横に並べる構成）に合わせて、
+モダリティ別の行の中に検査を古い順（左→右）に並べる横型グリッドで表示する。
+選択中の検査と直前の検査をカードで並べ、比較読影を意識したレイアウトにしている。
+
+backendにはまだ「保存済みDICOMファイルを画像として配信するAPI」（閲覧用の配信API）が無いため、
+実製品のような画像サムネイルの代わりに、検査日と検査記述を表示するブロックにしている。
 
 検査一覧（`StudyTable.vue`）は `public/dicom/manifest.json` を直接パースした表示データ、
 タイムラインはbackend DBのデータという別経路のため、**まだbackendにアップロードしていない患者は
 タイムラインが空になる**（アップロードすると同じ患者IDでbackendに登録されるため、そこで初めて繋がる）。
 空の場合は `/upload` へのリンク付きで案内する。
+
+## 実製品を参考にした画面構成（SYNAPSE LEAD）
+
+検査一覧・タイムラインの画面構成は、実在するPACS製品
+[SYNAPSE LEAD](https://www.fujifilm.com/jp/ja/healthcare/healthcare-it/it-imaging/synapse-lead)
+の画面キャプチャを参考にしている。真似た主な点:
+
+| 実製品の要素 | このプロジェクトでの対応 |
+|---|---|
+| 検査一覧は明るいテーマ、ビューア/タイムラインは暗いテーマ | `styles/theme.css` の `.theme-light` クラスをページのルート要素にだけ付けて、CSS変数の値をそのページ配下だけ上書きしている（コンポーネント側は`var(--color-xxx)`を参照するだけなので変更不要） |
+| 左サイドバー「検索プリセット」「分類フォルダ」 | `WorklistSidebar.vue`（検索条件の保存・フォルダ振り分け機能自体は無いため、今のところ見た目の再現が中心） |
+| 検査一覧の「読影ステータス」列（未記入/記入中/一時保存/最終確定） | `ReadingStatusBadge.vue` + `composables/useReadingStatus.ts`（レポート機能はスコープ外のため、状態はlocalStorageで簡易的に保持） |
+| 検査選択時に下へ表示される「同一患者IDの全検査」 | `PatientHistoryPanel.vue`（検査一覧の中から同じ患者IDのものを絞り込むだけなので追加のAPI呼び出しは無し） |
+| 検査選択時に下へ表示される「シリーズリスト」＋サムネイル | `SeriesListPanel.vue`（以前はポップアップモーダルだったが、実製品に合わせてインラインパネルに変更した） |
+| タイムラインのモダリティ別・日付軸のレイアウト | `TimelineView.vue`（上記「患者タイムライン」参照） |
+
+すべての画面が同じ配色である必要はない、という発想（画面の用途によってテーマを切り替える）は
+Phase 3で作ったCSS変数によるテーマ機構（1箇所書き換えるだけで見た目が変わる設計）が
+そのまま活きた例になっている。
 
 ## ビルド
 
