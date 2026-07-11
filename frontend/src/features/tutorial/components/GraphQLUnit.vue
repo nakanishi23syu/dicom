@@ -95,6 +95,7 @@
 import { ref, onMounted } from 'vue'
 import TutorialUnitShell from './TutorialUnitShell.vue'
 import { GRAPHQL_ENDPOINT } from '@/constants/env'
+import { describeAuthError } from '@/services/authErrorMessage'
 import {
   fetchUnreadInstances,
   markInstanceAsRead,
@@ -125,6 +126,8 @@ async function loadUnread() {
   }
 }
 
+// markInstanceAsRead/Unread は backend側で [Authorize] が付いているため、
+// ログインしていないと失敗する（describeAuthError が分かりやすいメッセージに変換する）。
 async function handleMarkRead(sop: GraphQLSop) {
   pendingUid.value = sop.sopInstanceUid
   errorMessage.value = ''
@@ -133,7 +136,7 @@ async function handleMarkRead(sop: GraphQLSop) {
     unreadSops.value = unreadSops.value.filter((s) => s.sopInstanceUid !== sop.sopInstanceUid)
     recentlyRead.value = [updated, ...recentlyRead.value]
   } catch (e) {
-    errorMessage.value = e instanceof Error ? e.message : String(e)
+    errorMessage.value = describeAuthError(e, 'この操作を行う権限がありません。')
   } finally {
     pendingUid.value = null
   }
@@ -147,7 +150,7 @@ async function handleMarkUnread(sop: GraphQLSop) {
     recentlyRead.value = recentlyRead.value.filter((s) => s.sopInstanceUid !== sop.sopInstanceUid)
     unreadSops.value = [updated, ...unreadSops.value]
   } catch (e) {
-    errorMessage.value = e instanceof Error ? e.message : String(e)
+    errorMessage.value = describeAuthError(e, 'この操作を行う権限がありません。')
   } finally {
     pendingUid.value = null
   }

@@ -1,9 +1,12 @@
+using System.Text;
 using DicomLearning.GraphQL.Constants;
 using DicomLearning.GraphQL.Data;
 using DicomLearning.GraphQL.GraphQL;
 using DicomLearning.GraphQL.Services;
 using DicomLearning.GraphQL.Configuration;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +21,36 @@ builder.Services.AddDbContext<DicomDbContext>(options =>
 // DICOMアップロード機能: 保存先フォルダの設定 + アップロード処理サービス本体。
 builder.Services.Configure<DicomStorageOptions>(builder.Configuration.GetSection("Storage"));
 builder.Services.AddScoped<DicomUploadService>();
+
+// ======================================================
+// JWT認証の設定
+// ======================================================
+// appsettings.json（実際の値はappsettings.Development.json）の "Jwt" セクションから
+// Issuer/Audience/署名鍵を読み込む。AddJwtBearer が「Authorizationヘッダーの
+// Bearerトークンを検証する」処理をASP.NET Coreパイプラインに組み込む。
+var jwtSection = builder.Configuration.GetSection("Jwt");
+builder.Services.Configure<JwtOptions>(jwtSection);
+builder.Services.AddScoped<AuthService>();
+
+var jwtOptions = jwtSection.Get<JwtOptions>() ?? new JwtOptions();
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtOptions.Issuer,
+            ValidateAudience = true,
+            ValidAudience = jwtOptions.Audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey)),
+            ValidateLifetime = true,
+            // トークンの有効期限切れを判定する際、サーバー間の時計のズレを許容する猶予（既定5分）を0にする。
+            ClockSkew = TimeSpan.Zero,
+        };
+    });
+builder.Services.AddAuthorization();
 
 // ======================================================
 // CORS設定（フロントエンドからのクロスオリジン通信を許可する）
@@ -40,14 +73,22 @@ builder.Services.AddCors(options =>
 // ======================================================
 // AddGraphQLServer() が GraphQL エンドポイントの土台を作り、
 // AddQueryType<T> / AddMutationType<T> で「どのC#クラスをQuery/Mutationのルートにするか」を教える。
+// .AddAuthorization() で HotChocolate に [Authorize] 属性を解釈させる（ASP.NET Core標準の
+// AddAuthorization とは別物で、GraphQL側のミドルウェアを有効化するために必要）。
 builder.Services
     .AddGraphQLServer()
     .AddQueryType<Query>()
-    .AddMutationType<Mutation>();
+    .AddMutationType<Mutation>()
+    .AddAuthorization();
 
 var app = builder.Build();
 
 app.UseCors(AppConstants.FrontendCorsPolicy);
+
+// UseAuthentication（「誰か」を判定）→ UseAuthorization（「その人に権限があるか」を判定）の順で登録する。
+// この順序を逆にすると認可判定の時点でユーザー情報が確定しておらず正しく動作しない。
+app.UseAuthentication();
+app.UseAuthorization();
 
 // ======================================================
 // 起動時にDBマイグレーションを適用し、データが空ならサンプルデータを投入する
@@ -57,8 +98,9 @@ app.UseCors(AppConstants.FrontendCorsPolicy);
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<DicomDbContext>();
+    var authService = scope.ServiceProvider.GetRequiredService<AuthService>();
     db.Database.Migrate();
-    DbSeeder.SeedIfEmpty(db);
+    DbSeeder.SeedIfEmpty(db, authService);
 }
 
 // /graphql に GraphQL エンドポイントを公開する。

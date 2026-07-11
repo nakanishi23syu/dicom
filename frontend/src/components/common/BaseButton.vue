@@ -21,7 +21,7 @@
     そのため <BaseButton @click="foo"> と書くだけで foo が呼ばれる。
   -->
   <button
-    type="button"
+    :type="type"
     class="base-button"
     :class="[`variant-${variant}`, { 'is-full-width': fullWidth }]"
     :disabled="disabled"
@@ -41,11 +41,16 @@ withDefaults(
     variant?: 'primary' | 'secondary' | 'danger'
     disabled?: boolean
     fullWidth?: boolean
+    // HTMLの<button>の type 属性。既定は "button"（クリックしてもフォームを送信しない）。
+    // <form @submit>の中で「これが送信ボタンです」と使いたい場合は type="submit" を渡す
+    // （例: LoginView.vue のログインボタン）。
+    type?: 'button' | 'submit'
   }>(),
   {
     variant: 'primary',
     disabled: false,
     fullWidth: false,
+    type: 'button',
   }
 )
 </script>

@@ -13,6 +13,7 @@ public sealed class DicomDbContext(DbContextOptions<DicomDbContext> options) : D
     public DbSet<UserStudy> UserStudies => Set<UserStudy>();
     public DbSet<UserSeries> UserSeries => Set<UserSeries>();
     public DbSet<UserSop> UserSops => Set<UserSop>();
+    public DbSet<AppUser> AppUsers => Set<AppUser>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -73,6 +74,16 @@ public sealed class DicomDbContext(DbContextOptions<DicomDbContext> options) : D
             entity.HasIndex(sop => sop.IsRead);
             entity.HasIndex(sop => sop.Order);
             // UserSeriesId（外部キー）にはEF Coreの規約により自動でindexが貼られる。
+        });
+
+        // ── app_user ──
+        modelBuilder.Entity<AppUser>(entity =>
+        {
+            entity.ToTable("app_user");
+            entity.HasKey(u => u.Id);
+
+            // ログインIDでの検索（認証時）のため一意制約 + index。
+            entity.HasIndex(u => u.Username).IsUnique();
         });
     }
 }

@@ -13,7 +13,7 @@
 -->
 
 <template>
-  <BaseButton variant="primary" :disabled="disabled" :full-width="fullWidth">
+  <BaseButton variant="primary" :disabled="disabled" :full-width="fullWidth" :type="type">
     <!-- slotに何も渡されなかったときは既定の文言「保存」を表示する -->
     <slot>保存</slot>
   </BaseButton>
@@ -26,10 +26,13 @@ withDefaults(
   defineProps<{
     disabled?: boolean
     fullWidth?: boolean
+    // フォームの送信ボタンとして使いたい場合は type="submit" を渡す（BaseButton.vue参照）。
+    type?: 'button' | 'submit'
   }>(),
   {
     disabled: false,
     fullWidth: false,
+    type: 'button',
   }
 )
 </script>

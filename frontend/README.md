@@ -13,6 +13,8 @@ Vue 3 + TypeScript 製の DICOM ビューアです。
 - **画像ビューア** — シリーズをダブルクリックするとピクセルデータを含む画像が一覧表示
 - **DICOMアップロード**（`/upload`） — ドラッグ&ドロップ（ファイル/フォルダ）・ファイル選択・フォルダ選択で
   DICOMファイルをbackendへ送信。解析・保存はすべてbackend側で行う（下記参照）
+- **ログイン**（`/login`） — JWT認証。ログイン状態はヘッダーに表示され、管理者アカウントのみ
+  並べ替え保存等の操作が可能になる（下記参照）
 
 ## 技術スタック
 
@@ -101,12 +103,15 @@ frontend/
 │   │   └── index.ts             # ルート定義（URL とページの対応）
 │   ├── services/
 │   │   ├── dicomService.ts      # dicom.tsライブラリとの通信（Vue に依存しない純粋関数）
-│   │   ├── graphqlClient.ts     # backend GraphQL への汎用リクエスト関数
+│   │   ├── graphqlClient.ts     # backend GraphQL への汎用リクエスト関数（JWT自動付与）
 │   │   ├── backendApiService.ts # backend GraphQL の個別クエリ・ミューテーション
+│   │   ├── authService.ts       # ログインAPIの呼び出し
+│   │   ├── authErrorMessage.ts  # 認証/認可エラーを分かりやすい日本語に変換
 │   │   ├── uploadService.ts     # backend への DICOM ファイルアップロード（REST）
 │   │   └── fileDropService.ts   # ドラッグ&ドロップされたファイル/フォルダの再帰的な収集
 │   ├── stores/
-│   │   └── dicomStore.ts        # グローバル状態管理（Pinia）
+│   │   ├── dicomStore.ts        # グローバル状態管理（Pinia）
+│   │   └── authStore.ts         # ログイン状態の管理（Pinia、localStorageと同期）
 │   ├── types/
 │   │   └── dicom.ts             # 型定義（Study / Series / Instance）
 │   ├── views/
@@ -200,6 +205,23 @@ DICOM画像本体は Vue 側ではなく **backend側のストレージフォル
 
 `services/uploadService.ts` が `FormData` に複数ファイルを詰めて1回のPOSTでまとめて送り、
 backend側はファイルごとの成功/失敗（同一SOP Instance UIDの重複はスキップ等）を返す。
+
+## ログイン（`/login`, `src/stores/authStore.ts`）
+
+backendの `login` ミューテーションでJWTを取得し、`authStore`（Pinia）とlocalStorageの両方に保存する。
+以降、`services/graphqlClient.ts` が全リクエストへ自動的に `Authorization: Bearer <token>` ヘッダーを付ける
+（localStorageを直接読む設計にしているのは、graphqlClient.tsがVue/Piniaに依存しないプレーンな
+関数モジュールのため。詳しくはファイル内コメント参照）。
+
+開発用アカウントは `backend/README.md` を参照（`admin`が管理者、`dr-tanaka`が一般）。
+管理者のみ許可される操作（並べ替え保存等）を一般アカウント・未ログインで試すと、
+`services/authErrorMessage.ts` が「ログインが必要です」「管理者アカウントが必要です」を
+判別して表示する（backendの `extensions.code` が `AUTH_NOT_AUTHENTICATED` か
+`AUTH_NOT_AUTHORIZED` かで判定している）。
+
+> 実装時のハマりどころ: `components/common/BaseButton.vue` は既定で `type="button"` を
+> 強制しており、`<form>` 内で送信ボタンとして使うと `@submit` が発火しなかった。
+> `type` propを追加し、ログインフォームでは明示的に `type="submit"` を渡すよう修正した。
 
 ## ビルド
 

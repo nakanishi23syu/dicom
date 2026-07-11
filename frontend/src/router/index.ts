@@ -19,6 +19,7 @@ const StudyListView = () => import('@/views/StudyListView.vue')
 const TutorialView = () => import('@/views/TutorialView.vue')
 const SeriesViewerView = () => import('@/views/SeriesViewerView.vue')
 const UploadView = () => import('@/views/UploadView.vue')
+const LoginView = () => import('@/views/LoginView.vue')
 
 // ======================================================
 // ルート定義
@@ -47,6 +48,11 @@ const routes = [
     path: '/upload',
     name: 'upload', // DICOMアップロードページ（backend/DicomLearning.GraphQL への保存）
     component: UploadView,
+  },
+  {
+    path: '/login',
+    name: 'login', // ログインページ（JWT取得。stores/authStore.ts参照）
+    component: LoginView,
   },
   // 将来の拡張例:
   // {

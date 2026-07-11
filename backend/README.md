@@ -67,19 +67,23 @@ DicomLearning.GraphQL/
 │   ├── UserStudy.cs         … 検査（テーブル: user_study）
 │   ├── UserSeries.cs        … シリーズ（テーブル: user_series）＋ 未読件数の計算プロパティ
 │   ├── UserSop.cs           … 画像1枚 / SOP Instance（テーブル: user_sop）＋ 既読/未読フラグ
-│   └── IOrderable.cs        … 並べ替え保存処理を3エンティティで共通化するためのインターフェース
+│   ├── IOrderable.cs        … 並べ替え保存処理を3エンティティで共通化するためのインターフェース
+│   └── AppUser.cs           … ログインユーザー（テーブル: app_user）。Username/PasswordHash/IsAdmin
 ├── Data/
 │   ├── DicomDbContext.cs    … EF CoreのDbContext。テーブル名・index・リレーションの定義
 │   └── DbSeeder.cs          … 開発用のサンプルデータ投入（テーブルが空の場合のみ）
 ├── Migrations/               … `dotnet ef migrations add` で生成されるスキーマ変更履歴
 ├── Configuration/
-│   └── DicomStorageOptions.cs … DICOMファイル保存先フォルダの設定（appsettings.jsonのStorageセクション）
+│   ├── DicomStorageOptions.cs … DICOMファイル保存先フォルダの設定（appsettings.jsonのStorageセクション）
+│   └── JwtOptions.cs        … JWT発行・検証設定（appsettings.jsonのJwtセクション）
 ├── Services/
 │   ├── DicomUploadService.cs … アップロードされたDICOMファイル1枚の解析・保存・DB登録
-│   └── DicomUploadResult.cs   … アップロード結果（成功/失敗）を表す型
+│   ├── DicomUploadResult.cs   … アップロード結果（成功/失敗）を表す型
+│   └── AuthService.cs       … パスワードのハッシュ化/照合、JWT発行
 └── GraphQL/
     ├── Query.cs             … 読み取り操作（検索・一覧取得）
-    └── Mutation.cs          … 書き込み操作（既読/未読の切り替え、並べ替え保存）
+    ├── Mutation.cs          … 書き込み操作（ログイン、既読/未読の切り替え、並べ替え保存）
+    └── AuthPayload.cs       … loginミューテーションの戻り値（token/displayName/isAdmin）
 ```
 
 ## 3-2. DICOMアップロード機能
@@ -100,6 +104,41 @@ GraphQLのmultipart request spec対応が別途必要になり、シンプルな
 
 DICOMファイルの階層構造（Study > Series > Instance）は `frontend/src/types/dicom.ts` と同じ考え方です。
 `Models/` 配下の3つのクラスはTypeScript側の対応する型と見比べてみると理解しやすいはずです。
+
+## 3-3. JWT認証・権限管理
+
+`login` ミューテーションでユーザー名・パスワードを照合し、成功したらJWTを返す。
+以降のリクエストは `Authorization: Bearer <token>` ヘッダーを付けて呼び出す。
+
+```graphql
+mutation {
+  login(username: "admin", password: "admin1234") {
+    token
+    displayName
+    isAdmin
+  }
+}
+```
+
+**開発用アカウント**（`DbSeeder.cs` で自動投入。パスワードは `AuthService.HashPassword` でハッシュ化して保存）:
+
+| ユーザー名 | パスワード | 権限 |
+|---|---|---|
+| `admin` | `admin1234` | 管理者（`IsAdmin = true`） |
+| `dr-tanaka` | `doctor1234` | 一般（`IsAdmin = false`） |
+
+> ⚠️ これは学習用の固定パスワードです。本番相当の環境では絶対に使い回さないでください。
+
+**認可のかけ方**（`GraphQL/Mutation.cs`）:
+
+- `[Authorize]` … ログインしていれば誰でも呼べる（例: `markInstanceAsRead`/`markInstanceAsUnread`）
+- `[Authorize(Roles = ["Admin"])]` … 管理者のみ呼べる（例: `reorderStudies`/`reorderSeries`/`reorderSops`。
+  並べ替えは全員に見える表示順を変える操作のため管理者限定にしている。
+  追加指示書の「管理者アカウントなら、できることが増える」に対応）
+
+`[Authorize]` が付いていないフィールド（`studies`クエリ等）は未ログインでも呼び出せる。
+JWTの署名鍵は `appsettings.Development.json` の `Jwt:SigningKey` にある開発用の値を使用しており、
+本番では環境変数（`Jwt__SigningKey`）等で必ず別の値に差し替えること。
 
 ## 3-1. テーブル設計（user_study / user_series / user_sop）
 
@@ -245,8 +284,6 @@ mutation {
 
 学習の焦点を絞るため、あえて次のような点は実装していません。実務のPACS開発ではいずれも重要な要素です。
 
-- **実際のDICOMファイル解析**: SQLite永続化までは対応済みですが、`fo-dicom` 等によるDICOMファイル自体の実解析（アップロード時のメタデータ抽出）は未実装です
-- **認証・認可**: `関連用語集.md` にある JWT認証・権限管理（管理者のみ削除可、等）
 - **DataLoader / N+1問題対策**: 今回の `Query` は `Include`/`ThenInclude` で一括読み込みしているため発生していませんが、
   例えば「検査一覧の各行で関連する読影レポートを都度取得する」ような設計にすると、
   1回のリクエストなのに裏でDBアクセスが大量発生する「N+1問題」が起きやすくなります。

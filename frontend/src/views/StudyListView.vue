@@ -29,6 +29,15 @@
           <span :class="{ spinning: store.loading }">↻</span>
           更新
         </button>
+        <!-- ログイン状態の表示。認証必須の操作（並べ替え保存等）を使う前にここでログインする。 -->
+        <div v-if="authStore.isLoggedIn" class="auth-status">
+          <span class="auth-name">
+            👤 {{ authStore.displayName }}
+            <span v-if="authStore.isAdmin" class="admin-badge">管理者</span>
+          </span>
+          <button class="auth-link" @click="authStore.logout()">ログアウト</button>
+        </div>
+        <RouterLink v-else :to="{ name: 'login' }" class="tutorial-link">🔑 ログイン</RouterLink>
       </div>
     </header>
 
@@ -74,6 +83,7 @@ import { useRouter } from 'vue-router'
 
 // Store から取得（@ エイリアスで src/ からの絶対パス）
 import { useDicomStore } from '@/stores/dicomStore'
+import { useAuthStore } from '@/stores/authStore'
 
 // feature コンポーネント（それぞれ独立した機能モジュール）
 import StudyTable from '@/features/study/components/StudyTable.vue'
@@ -89,6 +99,7 @@ const router = useRouter()
 // useDicomStore() を呼ぶだけで Store のインスタンスが得られる。
 // Store はシングルトンなので何度呼んでも同じインスタンスが返る。
 const store = useDicomStore()
+const authStore = useAuthStore()
 
 // ── ページ固有の UI 状態（グローバルでなくていい）──────
 // 選択中の検査はこのページだけで使う一時的な状態なので、
@@ -155,6 +166,44 @@ onMounted(() => store.fetchStudies())
 }
 
 .tutorial-link:hover {
+  text-decoration: underline;
+}
+
+.auth-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: 0.25rem;
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--color-border);
+}
+
+.auth-name {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.admin-badge {
+  font-size: 0.68rem;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border-radius: 10px;
+  padding: 1px 7px;
+}
+
+.auth-link {
+  background: none;
+  border: none;
+  color: var(--color-accent);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.2rem;
+}
+
+.auth-link:hover {
   text-decoration: underline;
 }
 

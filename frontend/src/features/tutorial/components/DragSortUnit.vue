@@ -145,6 +145,7 @@ import BaseButton from '@/components/common/BaseButton.vue'
 import SaveButton from '@/components/common/SaveButton.vue'
 import NotificationModal from '@/components/common/NotificationModal.vue'
 import { useDragSort } from '@/composables/useDragSort'
+import { describeAuthError } from '@/services/authErrorMessage'
 import {
   fetchStudies,
   reorderStudies,
@@ -226,23 +227,44 @@ function applyOrder<T extends { order: number }>(items: T[]) {
   items.sort((a, b) => a.order - b.order)
 }
 
+// 並べ替え保存は backend 側で [Authorize(Roles = "Admin")] が付いているため、
+// 管理者アカウントでログインしていないと失敗する（追加指示書の「管理者ならできることが増える」に対応）。
+// 未ログイン/非管理者の場合はGraphQLエラーがそのままthrowされるので、ここでcatchして分かりやすく表示する。
 async function saveStudyOrder() {
-  const matched = await reorderStudies(studies.value.map((s) => s.studyInstanceUid))
-  // 保存直後にサーバー側の新しいorder値をローカルにも反映しておく（0始まりの連番）。
-  studies.value.forEach((s, i) => (s.order = i))
-  showSaveResultMessage(`検査の並び順を保存しました（${matched}件更新）`)
+  try {
+    const matched = await reorderStudies(studies.value.map((s) => s.studyInstanceUid))
+    // 保存直後にサーバー側の新しいorder値をローカルにも反映しておく（0始まりの連番）。
+    studies.value.forEach((s, i) => (s.order = i))
+    showSaveResultMessage(`検査の並び順を保存しました（${matched}件更新）`)
+  } catch (e) {
+    showSaveResultMessage(describeReorderError(e))
+  }
 }
 
 async function saveSeriesOrder() {
-  const matched = await reorderSeries(seriesOfSelectedStudy.value.map((s) => s.seriesInstanceUid))
-  seriesOfSelectedStudy.value.forEach((s, i) => (s.order = i))
-  showSaveResultMessage(`シリーズの並び順を保存しました（${matched}件更新）`)
+  try {
+    const matched = await reorderSeries(
+      seriesOfSelectedStudy.value.map((s) => s.seriesInstanceUid)
+    )
+    seriesOfSelectedStudy.value.forEach((s, i) => (s.order = i))
+    showSaveResultMessage(`シリーズの並び順を保存しました（${matched}件更新）`)
+  } catch (e) {
+    showSaveResultMessage(describeReorderError(e))
+  }
 }
 
 async function saveSopOrder() {
-  const matched = await reorderSops(sopsOfSelectedSeries.value.map((s) => s.sopInstanceUid))
-  sopsOfSelectedSeries.value.forEach((s, i) => (s.order = i))
-  showSaveResultMessage(`SOPの並び順を保存しました（${matched}件更新）`)
+  try {
+    const matched = await reorderSops(sopsOfSelectedSeries.value.map((s) => s.sopInstanceUid))
+    sopsOfSelectedSeries.value.forEach((s, i) => (s.order = i))
+    showSaveResultMessage(`SOPの並び順を保存しました（${matched}件更新）`)
+  } catch (e) {
+    showSaveResultMessage(describeReorderError(e))
+  }
+}
+
+function describeReorderError(e: unknown): string {
+  return describeAuthError(e, '並べ替えの保存には管理者アカウントが必要です（admin / admin1234）。')
 }
 
 const showSaveResult = ref(false)
