@@ -1,3 +1,4 @@
+using DicomLearning.GraphQL.Constants;
 using DicomLearning.GraphQL.Data;
 using DicomLearning.GraphQL.GraphQL;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,22 @@ builder.Services.AddDbContext<DicomDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("Dicom")));
 
 // ======================================================
+// CORS設定（フロントエンドからのクロスオリジン通信を許可する）
+// ======================================================
+// フロントエンド（Vite開発サーバー、既定で http://localhost:5173）と
+// バックエンド（このASP.NET Coreアプリ、既定で http://localhost:5030）はポートが異なるため、
+// ブラウザの同一オリジンポリシーにより、CORSを許可しないとfetchが失敗する。
+// 許可オリジンは appsettings.json の Cors:AllowedOrigins（環境変数 Cors__AllowedOrigins でも上書き可）で管理する。
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(AppConstants.FrontendCorsPolicy, policy =>
+        policy.WithOrigins(allowedOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod());
+});
+
+// ======================================================
 // GraphQLサーバーの設定
 // ======================================================
 // AddGraphQLServer() が GraphQL エンドポイントの土台を作り、
@@ -23,6 +40,8 @@ builder.Services
     .AddMutationType<Mutation>();
 
 var app = builder.Build();
+
+app.UseCors(AppConstants.FrontendCorsPolicy);
 
 // ======================================================
 // 起動時にDBマイグレーションを適用し、データが空ならサンプルデータを投入する

@@ -67,6 +67,7 @@ import ReactivityInternalsUnit from '@/features/tutorial/components/ReactivityIn
 import SchedulerUpdateTimingUnit from '@/features/tutorial/components/SchedulerUpdateTimingUnit.vue'
 import KeyDiffAlgorithmUnit from '@/features/tutorial/components/KeyDiffAlgorithmUnit.vue'
 import CustomDirectivesUnit from '@/features/tutorial/components/CustomDirectivesUnit.vue'
+import GraphQLUnit from '@/features/tutorial/components/GraphQLUnit.vue'
 
 // ======================================================
 // units — 単元の一覧データ
@@ -139,6 +140,12 @@ const units: TutorialUnit[] = [
     label: 'v-memo・カスタムディレクティブ・KeepAlive',
     group: '応用・内部実装編',
     component: CustomDirectivesUnit,
+  },
+  {
+    id: 'graphql',
+    label: 'GraphQLバックエンドとの接続',
+    group: '応用・内部実装編',
+    component: GraphQLUnit,
   },
 ]
 
