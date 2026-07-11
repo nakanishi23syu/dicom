@@ -9,7 +9,7 @@ namespace DicomLearning.GraphQL.Models;
 // 関連用語集.md にある「読影」という業務行為は、
 // 「読影医がまだ見ていない画像」と「もう見た画像」を区別する必要がある。
 // このIsRead以下のプロパティ群は、その最小限の仮実装。
-public sealed class UserSop
+public sealed class UserSop : IOrderable
 {
     public int Id { get; set; }
 
@@ -29,4 +29,9 @@ public sealed class UserSop
     // 親（UserSeries）への外部キー
     public int UserSeriesId { get; set; }
     public UserSeries? Series { get; init; }
+
+    // Notion風のドラッグ&ドロップ並べ替えで保存する表示順。UserStudy.Orderと同じ考え方。
+    public int Order { get; set; }
+
+    string IOrderable.ReorderKey => SopInstanceUid;
 }

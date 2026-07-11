@@ -10,7 +10,7 @@ namespace DicomLearning.GraphQL.Models;
 //
 // DICOMファイルを毎回パースし直すのは負荷が高いため、一覧・検索・並べ替えで
 // よく使う項目（患者名・患者ID・検査日・部位等）をカラムとして外だししている。
-public sealed class UserStudy
+public sealed class UserStudy : IOrderable
 {
     // DB内部の主キー（DICOMのUIDとは別に、EF Coreのリレーション用に持つ）
     public int Id { get; set; }
@@ -30,5 +30,11 @@ public sealed class UserStudy
     // 検査部位（DICOMタグ BodyPartExamined (0018,0015) 相当）。
     public string BodyPartExamined { get; init; } = "";
 
+    // Notion風のドラッグ&ドロップ並べ替えで保存する表示順（並べ替え保存ボタン→Mutation.ReorderStudies）。
+    // 「並べ替え適用」を押すまでは既定のOrderBy（検査日等）で表示し、押されたらこの値で並べ替える運用を想定。
+    public int Order { get; set; }
+
     public List<UserSeries> Series { get; init; } = [];
+
+    string IOrderable.ReorderKey => StudyInstanceUid;
 }

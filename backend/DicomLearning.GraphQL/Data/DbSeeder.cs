@@ -32,6 +32,7 @@ internal static class DbSeeder
                 Modality = "CR",
                 AccessionNumber = "ACC-0001",
                 BodyPartExamined = "CHEST",
+                Order = 0,
                 Series =
                 [
                     new UserSeries
@@ -40,6 +41,7 @@ internal static class DbSeeder
                         SeriesNumber = "1",
                         SeriesDescription = "PA",
                         Modality = "CR",
+                        Order = 0,
                         Sops =
                         [
                             new UserSop
@@ -48,6 +50,7 @@ internal static class DbSeeder
                                 InstanceNumber = "1",
                                 FilePath = "/dicom/sample-chest-pa.dcm",
                                 IsRead = false,
+                                Order = 0,
                             },
                         ],
                     },
@@ -65,6 +68,7 @@ internal static class DbSeeder
                 Modality = "CR",
                 AccessionNumber = "ACC-0000",
                 BodyPartExamined = "CHEST",
+                Order = 1,
                 Series =
                 [
                     new UserSeries
@@ -73,6 +77,7 @@ internal static class DbSeeder
                         SeriesNumber = "1",
                         SeriesDescription = "PA",
                         Modality = "CR",
+                        Order = 0,
                         Sops =
                         [
                             new UserSop
@@ -84,6 +89,7 @@ internal static class DbSeeder
                                 IsRead = true,
                                 ReadAt = new DateTimeOffset(2026, 1, 11, 9, 30, 0, TimeSpan.FromHours(9)),
                                 ReadByUserId = "dr-suzuki",
+                                Order = 0,
                             },
                         ],
                     },
@@ -99,6 +105,7 @@ internal static class DbSeeder
                 Modality = "CT",
                 AccessionNumber = "ACC-0002",
                 BodyPartExamined = "ABDOMEN",
+                Order = 2,
                 Series =
                 [
                     new UserSeries
@@ -107,6 +114,7 @@ internal static class DbSeeder
                         SeriesNumber = "1",
                         SeriesDescription = "造影前",
                         Modality = "CT",
+                        Order = 0,
                         Sops =
                         [
                             new UserSop
@@ -115,6 +123,7 @@ internal static class DbSeeder
                                 InstanceNumber = "1",
                                 FilePath = "/dicom/sample-ct-plain-01.dcm",
                                 IsRead = false,
+                                Order = 0,
                             },
                             new UserSop
                             {
@@ -122,6 +131,7 @@ internal static class DbSeeder
                                 InstanceNumber = "2",
                                 FilePath = "/dicom/sample-ct-plain-02.dcm",
                                 IsRead = false,
+                                Order = 1,
                             },
                         ],
                     },
@@ -131,6 +141,7 @@ internal static class DbSeeder
                         SeriesNumber = "2",
                         SeriesDescription = "動脈相",
                         Modality = "CT",
+                        Order = 1,
                         Sops =
                         [
                             new UserSop
@@ -139,6 +150,7 @@ internal static class DbSeeder
                                 InstanceNumber = "1",
                                 FilePath = "/dicom/sample-ct-arterial-01.dcm",
                                 IsRead = false,
+                                Order = 0,
                             },
                         ],
                     },

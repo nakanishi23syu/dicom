@@ -5,7 +5,7 @@ namespace DicomLearning.GraphQL.Models;
 // ======================================================
 // src/types/dicom.ts の DicomSeries に対応する概念。
 // Study（検査） > Series（シリーズ） > Sop（画像1枚） の中間階層。
-public sealed class UserSeries
+public sealed class UserSeries : IOrderable
 {
     public int Id { get; set; }
 
@@ -23,4 +23,9 @@ public sealed class UserSeries
     // このシリーズに含まれる画像のうち、未読が何件残っているか。
     // GraphQL上では「もう計算済みの値」として単純に公開する（DBカラムではない。DbContext側でIgnore設定）。
     public int UnreadCount => Sops.Count(s => !s.IsRead);
+
+    // Notion風のドラッグ&ドロップ並べ替えで保存する表示順。UserStudy.Orderと同じ考え方。
+    public int Order { get; set; }
+
+    string IOrderable.ReorderKey => SeriesInstanceUid;
 }

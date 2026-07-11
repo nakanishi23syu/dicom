@@ -78,6 +78,8 @@ frontend/
 ├── src/
 │   ├── components/
 │   │   └── common/               # どの画面からも使う汎用UI部品（下記参照）
+│   ├── composables/
+│   │   └── useDragSort.ts        # Notion風ドラッグ&ドロップ並べ替えの共通ロジック（下記参照）
 │   ├── constants/
 │   │   └── env.ts                # .env の値を読む窓口
 │   ├── styles/
@@ -146,6 +148,19 @@ frontend/
 
 新しい色を使いたくなったら、まず `theme.css` に該当する変数があるか確認し、無ければ追加してから使うこと。
 各変数の意味は `theme.css` 内のコメントを参照（CSS初心者向けに詳しく解説している）。
+
+## Notion風ドラッグ&ドロップ並べ替え（`src/composables/useDragSort.ts`）
+
+検査一覧・シリーズ一覧・SOP（画像）一覧の3箇所で必要な「ドラッグして並べ替える」処理を、
+ライブラリを使わずブラウザ標準の `draggable` 属性 + dragstart/dragover/dropイベントだけで実装し、
+composableとして共通化している。
+
+- 並べ替え後、**並べ替え保存** ボタンで backend の `Order` カラムに反映（`reorderStudies`等のMutation）
+- **並べ替え適用** ボタンで、保存済みの `order` 値を使って表示順を並べ直す
+
+使用例は `src/features/tutorial/components/DragSortUnit.vue`
+（Vue学習チュートリアルの「Notion風ドラッグ&ドロップ並べ替え」単元）で、
+backendの実データを使って検査→シリーズ→SOPの3階層すべてを実際に動かしながら確認できる。
 
 ## ビルド
 

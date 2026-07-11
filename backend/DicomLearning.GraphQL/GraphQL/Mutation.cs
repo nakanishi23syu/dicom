@@ -55,4 +55,47 @@ public class Mutation
         return sop ?? throw new ArgumentException(
             $"指定されたSOP Instance UIDの画像が見つかりません: {sopInstanceUid}");
     }
+
+    // ======================================================
+    // 並べ替え保存（Notion風ドラッグ&ドロップ並べ替え）
+    // ======================================================
+    // フロントエンドでドラッグ&ドロップして決めた新しい並び順を、
+    // UIDの配列（orderedXxxUids）として渡してもらい、Orderカラムに書き込む。
+    // 検査・シリーズ・SOPの3箇所で同じ形の処理が必要なため、
+    // ApplyReorderAsync に共通ロジックをまとめている（IOrderableインターフェース経由）。
+    // 戻り値は「実際に見つかって更新できた件数」。渡されたUIDがDB上に無い場合はカウントされない。
+
+    public Task<int> ReorderStudiesAsync(List<string> orderedStudyInstanceUids, [Service] DicomDbContext db) =>
+        ApplyReorderAsync(db.UserStudies, orderedStudyInstanceUids, db);
+
+    public Task<int> ReorderSeriesAsync(List<string> orderedSeriesInstanceUids, [Service] DicomDbContext db) =>
+        ApplyReorderAsync(db.UserSeries, orderedSeriesInstanceUids, db);
+
+    public Task<int> ReorderSopsAsync(List<string> orderedSopInstanceUids, [Service] DicomDbContext db) =>
+        ApplyReorderAsync(db.UserSops, orderedSopInstanceUids, db);
+
+    private static async Task<int> ApplyReorderAsync<TEntity>(
+        DbSet<TEntity> set,
+        IReadOnlyList<string> orderedKeys,
+        DicomDbContext db)
+        where TEntity : class, IOrderable
+    {
+        // 学習用プロジェクト規模のデータ量を前提に、対象テーブルを全件メモリに載せてから
+        // UIDでの引き当てを行っている（件数が増えた場合はWHERE句での絞り込みを検討）。
+        var entities = await set.ToListAsync();
+        var byKey = entities.ToDictionary(e => ((IOrderable)e).ReorderKey);
+
+        var matched = 0;
+        for (var i = 0; i < orderedKeys.Count; i++)
+        {
+            if (byKey.TryGetValue(orderedKeys[i], out var entity))
+            {
+                entity.Order = i;
+                matched++;
+            }
+        }
+
+        await db.SaveChangesAsync();
+        return matched;
+    }
 }

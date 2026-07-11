@@ -66,14 +66,15 @@ DicomLearning.GraphQL/
 ├── Models/                  … データの「形」（EF Coreエンティティ）
 │   ├── UserStudy.cs         … 検査（テーブル: user_study）
 │   ├── UserSeries.cs        … シリーズ（テーブル: user_series）＋ 未読件数の計算プロパティ
-│   └── UserSop.cs           … 画像1枚 / SOP Instance（テーブル: user_sop）＋ 既読/未読フラグ
+│   ├── UserSop.cs           … 画像1枚 / SOP Instance（テーブル: user_sop）＋ 既読/未読フラグ
+│   └── IOrderable.cs        … 並べ替え保存処理を3エンティティで共通化するためのインターフェース
 ├── Data/
 │   ├── DicomDbContext.cs    … EF CoreのDbContext。テーブル名・index・リレーションの定義
 │   └── DbSeeder.cs          … 開発用のサンプルデータ投入（テーブルが空の場合のみ）
 ├── Migrations/               … `dotnet ef migrations add` で生成されるスキーマ変更履歴
 └── GraphQL/
     ├── Query.cs             … 読み取り操作（検索・一覧取得）
-    └── Mutation.cs          … 書き込み操作（既読/未読の切り替え）
+    └── Mutation.cs          … 書き込み操作（既読/未読の切り替え、並べ替え保存）
 ```
 
 DICOMファイルの階層構造（Study > Series > Instance）は `frontend/src/types/dicom.ts` と同じ考え方です。
@@ -86,9 +87,12 @@ DICOMファイルを毎回パースし直すのは負荷が高いため、一覧
 
 | テーブル | 主な列 | index |
 |---|---|---|
-| `user_study` | `StudyInstanceUid`, `PatientId`, `PatientName`, `StudyDate`, `StudyDescription`, `Modality`, `AccessionNumber`, `BodyPartExamined` | `StudyInstanceUid`(unique), `PatientId`, `StudyDate`, `PatientId+StudyDate`(複合, タイムライン用), `AccessionNumber` |
-| `user_series` | `SeriesInstanceUid`, `SeriesNumber`, `SeriesDescription`, `Modality`, `UserStudyId`(FK) | `SeriesInstanceUid`(unique), `UserStudyId`(FK, EF Core規約で自動付与) |
-| `user_sop` | `SopInstanceUid`, `InstanceNumber`, `FilePath`, `IsRead`, `ReadAt`, `ReadByUserId`, `UserSeriesId`(FK) | `SopInstanceUid`(unique), `IsRead`(未読一覧の絞り込み用), `UserSeriesId`(FK, EF Core規約で自動付与) |
+| `user_study` | `StudyInstanceUid`, `PatientId`, `PatientName`, `StudyDate`, `StudyDescription`, `Modality`, `AccessionNumber`, `BodyPartExamined`, `Order` | `StudyInstanceUid`(unique), `PatientId`, `StudyDate`, `PatientId+StudyDate`(複合, タイムライン用), `AccessionNumber`, `Order` |
+| `user_series` | `SeriesInstanceUid`, `SeriesNumber`, `SeriesDescription`, `Modality`, `UserStudyId`(FK), `Order` | `SeriesInstanceUid`(unique), `UserStudyId`(FK, EF Core規約で自動付与), `Order` |
+| `user_sop` | `SopInstanceUid`, `InstanceNumber`, `FilePath`, `IsRead`, `ReadAt`, `ReadByUserId`, `UserSeriesId`(FK), `Order` | `SopInstanceUid`(unique), `IsRead`(未読一覧の絞り込み用), `UserSeriesId`(FK, EF Core規約で自動付与), `Order` |
+
+`Order` はNotion風のドラッグ&ドロップ並べ替え機能用の表示順（`Mutation.ReorderStudies`等で更新）。
+詳細はセクション5の「並べ替え保存」の例、フロントエンド側は `frontend/src/composables/useDragSort.ts` を参照。
 
 ### マイグレーションの操作
 
@@ -201,6 +205,18 @@ mutation {
     sopInstanceUid
     isRead
   }
+}
+```
+
+### 検査の並べ替えを保存する（Notion風ドラッグ&ドロップ）
+
+ドラッグ&ドロップ後の新しい順番をUIDの配列で渡すと、`Order` 列に0始まりの連番で書き込まれる。
+戻り値は実際に一致して更新できた件数（渡したUIDがDBに無ければカウントされない）。
+シリーズ・SOPも `reorderSeries` / `reorderSops` で同様に呼び出せる（`Mutation.cs` の `ApplyReorderAsync` を共通利用）。
+
+```graphql
+mutation {
+  reorderStudies(orderedStudyInstanceUids: ["1.2.392.study.2", "1.2.392.study.0", "1.2.392.study.1"])
 }
 ```
 

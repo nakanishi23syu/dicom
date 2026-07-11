@@ -35,6 +35,9 @@ public sealed class DicomDbContext(DbContextOptions<DicomDbContext> options) : D
             // Accession Number（RIS/PACS横断の検査識別キー）での検索用。
             entity.HasIndex(s => s.AccessionNumber);
 
+            // 「並べ替え適用」時に ORDER BY Order で並べ替えるためのindex。
+            entity.HasIndex(s => s.Order);
+
             entity.HasMany(s => s.Series)
                 .WithOne(se => se.Study)
                 .HasForeignKey(se => se.UserStudyId)
@@ -47,6 +50,7 @@ public sealed class DicomDbContext(DbContextOptions<DicomDbContext> options) : D
             entity.ToTable("user_series");
             entity.HasKey(se => se.Id);
             entity.HasIndex(se => se.SeriesInstanceUid).IsUnique();
+            entity.HasIndex(se => se.Order);
             // UserStudyId（外部キー）にはEF Coreの規約により自動でindexが貼られる。
 
             entity.HasMany(se => se.Sops)
@@ -67,6 +71,7 @@ public sealed class DicomDbContext(DbContextOptions<DicomDbContext> options) : D
 
             // 「未読一覧（読影ワークリスト）」の絞り込みで使うためindexを貼る。
             entity.HasIndex(sop => sop.IsRead);
+            entity.HasIndex(sop => sop.Order);
             // UserSeriesId（外部キー）にはEF Coreの規約により自動でindexが貼られる。
         });
     }

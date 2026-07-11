@@ -16,6 +16,29 @@ export interface GraphQLSop {
   isRead: boolean
   readAt: string | null
   readByUserId: string | null
+  order: number
+}
+
+export interface GraphQLSeries {
+  seriesInstanceUid: string
+  seriesNumber: string
+  seriesDescription: string
+  modality: string
+  order: number
+  sops: GraphQLSop[]
+}
+
+export interface GraphQLStudy {
+  studyInstanceUid: string
+  patientName: string
+  patientId: string
+  studyDate: string
+  studyDescription: string
+  modality: string
+  accessionNumber: string
+  bodyPartExamined: string
+  order: number
+  series: GraphQLSeries[]
 }
 
 // ======================================================
@@ -31,6 +54,7 @@ export async function fetchUnreadInstances(): Promise<GraphQLSop[]> {
         isRead
         readAt
         readByUserId
+        order
       }
     }
   `
@@ -83,4 +107,86 @@ export async function markInstanceAsUnread(sopInstanceUid: string): Promise<Grap
     sopInstanceUid,
   })
   return data.markInstanceAsUnread
+}
+
+// ======================================================
+// fetchStudies — 検査一覧（シリーズ・SOPまで含む階層）を取得する
+// ======================================================
+// orderフィールドも取得しておき、「並べ替え適用」ボタンでこの値を使って並べ替えられるようにする。
+export async function fetchStudies(): Promise<GraphQLStudy[]> {
+  const query = `
+    query Studies {
+      studies {
+        studyInstanceUid
+        patientName
+        patientId
+        studyDate
+        studyDescription
+        modality
+        accessionNumber
+        bodyPartExamined
+        order
+        series {
+          seriesInstanceUid
+          seriesNumber
+          seriesDescription
+          modality
+          order
+          sops {
+            sopInstanceUid
+            instanceNumber
+            filePath
+            isRead
+            readAt
+            readByUserId
+            order
+          }
+        }
+      }
+    }
+  `
+
+  const data = await graphqlRequest<{ studies: GraphQLStudy[] }>(query)
+  return data.studies
+}
+
+// ======================================================
+// 並べ替え保存（Notion風ドラッグ&ドロップ並べ替え）
+// ======================================================
+// ドラッグ&ドロップで決めた新しい順番のUIDを配列で渡すと、backend側のOrderカラムに反映される。
+// 戻り値は実際に更新できた件数（渡したUIDがDBに存在しない場合はカウントされない）。
+export async function reorderStudies(orderedStudyInstanceUids: string[]): Promise<number> {
+  const query = `
+    mutation ReorderStudies($ids: [String!]!) {
+      reorderStudies(orderedStudyInstanceUids: $ids)
+    }
+  `
+  const data = await graphqlRequest<{ reorderStudies: number }>(query, {
+    ids: orderedStudyInstanceUids,
+  })
+  return data.reorderStudies
+}
+
+export async function reorderSeries(orderedSeriesInstanceUids: string[]): Promise<number> {
+  const query = `
+    mutation ReorderSeries($ids: [String!]!) {
+      reorderSeries(orderedSeriesInstanceUids: $ids)
+    }
+  `
+  const data = await graphqlRequest<{ reorderSeries: number }>(query, {
+    ids: orderedSeriesInstanceUids,
+  })
+  return data.reorderSeries
+}
+
+export async function reorderSops(orderedSopInstanceUids: string[]): Promise<number> {
+  const query = `
+    mutation ReorderSops($ids: [String!]!) {
+      reorderSops(orderedSopInstanceUids: $ids)
+    }
+  `
+  const data = await graphqlRequest<{ reorderSops: number }>(query, {
+    ids: orderedSopInstanceUids,
+  })
+  return data.reorderSops
 }

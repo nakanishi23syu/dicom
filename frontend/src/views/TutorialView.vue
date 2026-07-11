@@ -69,6 +69,7 @@ import KeyDiffAlgorithmUnit from '@/features/tutorial/components/KeyDiffAlgorith
 import CustomDirectivesUnit from '@/features/tutorial/components/CustomDirectivesUnit.vue'
 import GraphQLUnit from '@/features/tutorial/components/GraphQLUnit.vue'
 import CommonComponentsUnit from '@/features/tutorial/components/CommonComponentsUnit.vue'
+import DragSortUnit from '@/features/tutorial/components/DragSortUnit.vue'
 
 // ======================================================
 // units — 単元の一覧データ
@@ -153,6 +154,12 @@ const units: TutorialUnit[] = [
     label: '汎用UIコンポーネント',
     group: '応用・内部実装編',
     component: CommonComponentsUnit,
+  },
+  {
+    id: 'drag-sort',
+    label: 'Notion風ドラッグ&ドロップ並べ替え',
+    group: '応用・内部実装編',
+    component: DragSortUnit,
   },
 ]
 
