@@ -16,16 +16,18 @@ dist/
 *.ntvs*
 *.njsproj
 *.sln
-# graphql/ の学習用C#プロジェクトはslnをコミット対象にするため除外を打ち消す
-!graphql/**/*.sln
 
-# .NET（graphql/ 配下の学習用C#プロジェクトのビルド成果物）
-graphql/**/bin/
-graphql/**/obj/
+# .NET（backend/ 配下のC#プロジェクトのビルド成果物）
+backend/**/bin/
+backend/**/obj/
 
 # OS が自動生成するファイル
 .DS_Store
 Thumbs.db
+
+# Python キャッシュ（frontend/download_dicom.py 実行時に生成）
+__pycache__/
+*.pyc
 
 # ログ
 *.log
