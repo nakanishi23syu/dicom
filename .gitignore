@@ -21,6 +21,11 @@ dist/
 backend/**/bin/
 backend/**/obj/
 
+# SQLite（ローカルで再生成できるDBファイル。スキーマはMigrationsで管理）
+backend/**/*.db
+backend/**/*.db-shm
+backend/**/*.db-wal
+
 # OS が自動生成するファイル
 .DS_Store
 Thumbs.db

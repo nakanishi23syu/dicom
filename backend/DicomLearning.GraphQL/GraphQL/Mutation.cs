@@ -1,6 +1,7 @@
 using DicomLearning.GraphQL.Data;
 using DicomLearning.GraphQL.Models;
 using HotChocolate;
+using Microsoft.EntityFrameworkCore;
 
 namespace DicomLearning.GraphQL.GraphQL;
 
@@ -22,15 +23,36 @@ namespace DicomLearning.GraphQL.GraphQL;
 public class Mutation
 {
     // ── 画像を既読にする（このプロジェクトの主目的の仮実装） ──
-    public DicomInstance MarkInstanceAsRead(
+    public async Task<UserSop> MarkInstanceAsReadAsync(
         string sopInstanceUid,
         string userId,
-        [Service] InMemoryDicomRepository repository) =>
-        repository.MarkInstanceAsRead(sopInstanceUid, userId);
+        [Service] DicomDbContext db)
+    {
+        var sop = await FindSopOrThrowAsync(sopInstanceUid, db);
+        sop.IsRead = true;
+        sop.ReadAt = DateTimeOffset.UtcNow;
+        sop.ReadByUserId = userId;
+        await db.SaveChangesAsync();
+        return sop;
+    }
 
     // ── 画像を未読に戻す（誤って既読にしてしまった場合の取り消し等を想定） ──
-    public DicomInstance MarkInstanceAsUnread(
+    public async Task<UserSop> MarkInstanceAsUnreadAsync(
         string sopInstanceUid,
-        [Service] InMemoryDicomRepository repository) =>
-        repository.MarkInstanceAsUnread(sopInstanceUid);
+        [Service] DicomDbContext db)
+    {
+        var sop = await FindSopOrThrowAsync(sopInstanceUid, db);
+        sop.IsRead = false;
+        sop.ReadAt = null;
+        sop.ReadByUserId = null;
+        await db.SaveChangesAsync();
+        return sop;
+    }
+
+    private static async Task<UserSop> FindSopOrThrowAsync(string sopInstanceUid, DicomDbContext db)
+    {
+        var sop = await db.UserSops.FirstOrDefaultAsync(s => s.SopInstanceUid == sopInstanceUid);
+        return sop ?? throw new ArgumentException(
+            $"指定されたSOP Instance UIDの画像が見つかりません: {sopInstanceUid}");
+    }
 }

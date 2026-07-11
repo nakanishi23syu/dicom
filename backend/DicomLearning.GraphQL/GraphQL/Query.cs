@@ -1,6 +1,7 @@
 using DicomLearning.GraphQL.Data;
 using DicomLearning.GraphQL.Models;
 using HotChocolate;
+using Microsoft.EntityFrameworkCore;
 
 namespace DicomLearning.GraphQL.GraphQL;
 
@@ -12,7 +13,7 @@ namespace DicomLearning.GraphQL.GraphQL;
 // 普通のC#クラス・メソッドを書くと、そこからHotChocolateが自動でGraphQLスキーマを生成する。
 // このクラスの public メソッドがそのまま GraphQL の「フィールド」になる。
 //
-// 例えば下の GetStudies() メソッドは、GraphQL上では次のように呼び出せる:
+// 例えば下の GetStudiesAsync() メソッドは、GraphQL上では次のように呼び出せる:
 //   query {
 //     studies {
 //       studyInstanceUid
@@ -20,30 +21,46 @@ namespace DicomLearning.GraphQL.GraphQL;
 //       series { seriesDescription unreadCount }
 //     }
 //   }
-// ※ HotChocolateの命名規則により、メソッド名先頭の "Get" は取り除かれ、
+// ※ HotChocolateの命名規則により、メソッド名先頭の "Get" と末尾の "Async" は取り除かれ、
 //   camelCase（studies）としてスキーマに公開される。
 //
 // [Service] 属性: このパラメータは GraphQL のクエリ引数ではなく、
 // ASP.NET Core の DI コンテナから注入されることを示す。
-// Program.cs で AddSingleton<InMemoryDicomRepository>() 済みのインスタンスがここに渡ってくる。
+// Program.cs で AddDbContext<DicomDbContext>() 済みのインスタンス（リクエストごとのScoped）が渡ってくる。
+//
+// N+1問題について: Series/Sopsは Include で一括読み込みしている（DataLoaderは今回未導入。
+// 将来アクセスが増えた場合は HotChocolate 同梱の GreenDonut を検討する）。
 public class Query
 {
-    public IReadOnlyList<DicomStudy> GetStudies([Service] InMemoryDicomRepository repository) =>
-        repository.GetStudies();
+    public async Task<List<UserStudy>> GetStudiesAsync([Service] DicomDbContext db) =>
+        await db.UserStudies
+            .Include(s => s.Series)
+            .ThenInclude(se => se.Sops)
+            .OrderByDescending(s => s.StudyDate)
+            .ToListAsync();
 
-    public DicomSeries? GetSeries(string seriesInstanceUid, [Service] InMemoryDicomRepository repository) =>
-        repository.GetSeriesByUid(seriesInstanceUid);
+    public async Task<UserSeries?> GetSeriesAsync(string seriesInstanceUid, [Service] DicomDbContext db) =>
+        await db.UserSeries
+            .Include(se => se.Sops)
+            .FirstOrDefaultAsync(se => se.SeriesInstanceUid == seriesInstanceUid);
 
-    // ── SYNAPSE_LEADの「タイムラインビュー」を模したクエリ ──
+    // ── 関連用語集.md の「タイムラインビュー」を模したクエリ ──
     // 同一患者の過去検査を新しい順に並べて返す。用語集にある「比較読影」の土台になる情報。
     // query { patientTimeline(patientId: "patient-001") { studyDate studyDescription } }
-    public IReadOnlyList<DicomStudy> GetPatientTimeline(
+    public async Task<List<UserStudy>> GetPatientTimelineAsync(
         string patientId,
-        [Service] InMemoryDicomRepository repository) =>
-        repository.GetPatientTimeline(patientId);
+        [Service] DicomDbContext db) =>
+        await db.UserStudies
+            .Where(s => s.PatientId == patientId)
+            .Include(s => s.Series)
+            .ThenInclude(se => se.Sops)
+            .OrderByDescending(s => s.StudyDate)
+            .ToListAsync();
 
     // ── 未読画像の一覧 ──
     // 読影医が次に見るべき画像の「読影ワークリスト」のようなイメージ。
-    public IReadOnlyList<DicomInstance> GetUnreadInstances([Service] InMemoryDicomRepository repository) =>
-        repository.GetUnreadInstances();
+    public async Task<List<UserSop>> GetUnreadInstancesAsync([Service] DicomDbContext db) =>
+        await db.UserSops
+            .Where(sop => !sop.IsRead)
+            .ToListAsync();
 }
