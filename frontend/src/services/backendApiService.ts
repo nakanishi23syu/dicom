@@ -334,6 +334,87 @@ export async function updateSopFields(
 }
 
 // ======================================================
+// DICOMタグへの復元（インライン編集で上書きした値を元のタグ値に戻す）
+// ======================================================
+// 「編集前の値」は別途保持していない。backend側で実ファイルを都度読み直して復元するため、
+// 復元後の実際の値をレスポンスから受け取り、呼び出し側でローカルの表示データに反映する。
+export interface RevertedStudyFields {
+  studyInstanceUid: string
+  patientId: string
+  patientName: string
+  studyDate: string
+  studyDescription: string
+  modality: string
+  accessionNumber: string
+  bodyPartExamined: string
+}
+
+export async function revertStudyFields(studyInstanceUid: string): Promise<RevertedStudyFields> {
+  const query = `
+    mutation RevertStudyFields($studyInstanceUid: String!) {
+      revertStudyFields(studyInstanceUid: $studyInstanceUid) {
+        studyInstanceUid
+        patientId
+        patientName
+        studyDate
+        studyDescription
+        modality
+        accessionNumber
+        bodyPartExamined
+      }
+    }
+  `
+  const data = await graphqlRequest<{ revertStudyFields: RevertedStudyFields }>(query, {
+    studyInstanceUid,
+  })
+  return data.revertStudyFields
+}
+
+export interface RevertedSeriesFields {
+  seriesInstanceUid: string
+  seriesNumber: string
+  seriesDescription: string
+  modality: string
+}
+
+export async function revertSeriesFields(seriesInstanceUid: string): Promise<RevertedSeriesFields> {
+  const query = `
+    mutation RevertSeriesFields($seriesInstanceUid: String!) {
+      revertSeriesFields(seriesInstanceUid: $seriesInstanceUid) {
+        seriesInstanceUid
+        seriesNumber
+        seriesDescription
+        modality
+      }
+    }
+  `
+  const data = await graphqlRequest<{ revertSeriesFields: RevertedSeriesFields }>(query, {
+    seriesInstanceUid,
+  })
+  return data.revertSeriesFields
+}
+
+export interface RevertedSopFields {
+  sopInstanceUid: string
+  instanceNumber: string
+}
+
+export async function revertSopFields(sopInstanceUid: string): Promise<RevertedSopFields> {
+  const query = `
+    mutation RevertSopFields($sopInstanceUid: String!) {
+      revertSopFields(sopInstanceUid: $sopInstanceUid) {
+        sopInstanceUid
+        instanceNumber
+      }
+    }
+  `
+  const data = await graphqlRequest<{ revertSopFields: RevertedSopFields }>(query, {
+    sopInstanceUid,
+  })
+  return data.revertSopFields
+}
+
+// ======================================================
 // カスケード削除（DBのレコード＋紐づくDICOMファイルを削除する）
 // ======================================================
 export async function deleteStudy(studyInstanceUid: string): Promise<void> {

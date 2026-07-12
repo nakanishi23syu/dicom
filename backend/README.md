@@ -3,7 +3,7 @@
 このディレクトリは、Vueアプリ本体（`../frontend`）とは**独立した**、GraphQLの仕組みを学ぶためのC#サンプルプロジェクトです。
 
 - **まだVueアプリとは繋がっていません。** コードが読める・動かせる状態を目標にしています。
-- 題材として、[`関連用語集.md`](../関連用語集.md)（富士フイルムのPACS製品「SYNAPSE LEAD」案件の参画準備用語集）にありそうな機能を仮実装しています。
+- 題材として、[`関連用語集.md`](../関連用語集.md)（PACS/DICOM関連の用語集）にありそうな機能を仮実装しています。
   - 画像の**既読/未読フラグ**（メインの題材）
   - 患者ごとの**タイムラインビュー**（同一患者の過去検査を時系列で並べる、比較読影の土台になる機能）
 - データは **Entity Framework Core + SQLite** で永続化しています（`dicom.db`。アプリ再起動してもデータは消えません）。
@@ -19,7 +19,7 @@ GET /api/studies/123/series → シリーズ一覧が返ってくる
 
 画面によって必要な項目が違うと、`GET /api/studies/123?fields=patientName,studyDate` のような
 専用パラメータや専用エンドポイントが増えがちです。DICOMのメタデータのように項目数が非常に多い場合、
-これは無視できない問題になります（`13_SYNAPSE_LEAD_関連用語集.md` の「GraphQL」の項目を参照）。
+これは無視できない問題になります（`関連用語集.md` の「GraphQL」の項目を参照）。
 
 GraphQLは逆に、**「1つのエンドポイント」＋「クライアントが欲しい形を自分で指定する」**方式です。
 
@@ -91,8 +91,9 @@ DicomLearning.GraphQL/
 `POST /api/dicom-upload`（`multipart/form-data`、キー名 `files` で複数ファイル）にDICOMファイルを送ると、
 [fo-dicom](https://github.com/fo-dicom/fo-dicom) でタグを解析し、
 
-1. `Storage/dicom/{StudyInstanceUID}/{SeriesInstanceUID}/{SOPInstanceUID}.dcm` にファイル本体を保存
-   （保存先は Vue側ではなくこのバックエンド側。フォルダは `appsettings.json` の `Storage:DicomRoot` で変更可能）
+1. リポジトリ直下の `dicom/{StudyInstanceUID}/{SeriesInstanceUID}/{SOPInstanceUID}.dcm` にファイル本体を保存
+   （保存先は Vue側ではなくこのバックエンド側。`/dicom` フォルダはgitで管理しサンプルデータとして残す方針。
+   保存先フォルダは `appsettings.json` の `Storage:DicomRoot` で変更可能）
 2. `user_study` / `user_series` / `user_sop` に該当行が無ければ作成（UIDで存在確認するupsert）
 
 を行う。GraphQLではなく素のHTTP POSTにしているのは、バイナリファイルのアップロードは

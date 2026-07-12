@@ -10,7 +10,7 @@ dicom-tool/
 ├── frontend/              … Vue 3 + TypeScript 製のビューアUI（詳細: frontend/README.md）
 ├── backend/                … C# / HotChocolate 製の GraphQL API（詳細: backend/README.md）
 ├── 環境構築手順書.md         … 開発環境のセットアップ手順（他プロジェクトの環境構築にも流用可能）
-├── 関連用語集.md             … PACS/DICOM関連の用語集（SYNAPSE LEAD案件の参画準備用）
+├── 関連用語集.md             … PACS/DICOM関連の用語集
 └── 追加指示書.md             … 今後の機能追加の指示書
 ```
 

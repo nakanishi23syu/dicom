@@ -53,14 +53,15 @@
           </span>
         </span>
 
-        <!-- ── Notion風チェック→削除（指示書2.md要望4）── -->
-        <button
-          v-if="checkable.checkedIds.value.size > 0"
-          class="delete-selected-btn"
-          @click="showDeleteConfirm = true"
-        >
-          🗑 選択した{{ checkable.checkedIds.value.size }}件を削除
-        </button>
+        <!-- ── Notion風チェック→編集・削除（指示書2.md要望4）── -->
+        <span v-if="checkable.checkedIds.value.size > 0" class="checked-actions">
+          <button class="revert-btn" :disabled="reverting" @click="handleRevertChecked">
+            🔄 選択した{{ checkable.checkedIds.value.size }}件をDICOMタグの値に戻す
+          </button>
+          <button class="delete-selected-btn" @click="showDeleteConfirm = true">
+            🗑 選択した{{ checkable.checkedIds.value.size }}件を削除
+          </button>
+        </span>
       </div>
 
       <!-- フィルターパネル: 条件を1つずつ「項目・演算子・値」の3点セットで積み重ねる -->
@@ -365,6 +366,7 @@ import { useAuthStore } from '@/stores/authStore'
 import {
   reorderStudies,
   updateStudyFields,
+  revertStudyFields,
   deleteStudy,
   type StudyFieldsInput,
 } from '@/services/backendApiService'
@@ -532,6 +534,7 @@ const displayedStudies = computed(() =>
 // ======================================================
 const checkable = useCheckableRows<DicomStudy>((s) => s.studyInstanceUID)
 const showDeleteConfirm = ref(false)
+const reverting = ref(false)
 
 // セル1つ分の編集を確定する（inputのblur時に呼ばれる）。
 // toMutationInput: 入力値からbackendへ渡すStudyFieldsInputを組み立てる
@@ -548,6 +551,30 @@ async function saveField(
     applyLocal(value)
   } catch (e) {
     alert(e instanceof Error ? e.message : '保存に失敗しました')
+  }
+}
+
+// チェックした行を、実際のDICOMファイルのタグ値に戻す（インライン編集で上書きした値を破棄する）。
+// 「編集前の値」はDB側で保持していないため、backendが都度実ファイルを読み直して復元し、
+// その復元結果をレスポンスとして受け取ってローカルのstudyオブジェクトへ反映する。
+async function handleRevertChecked() {
+  const ids = [...checkable.checkedIds.value]
+  reverting.value = true
+  try {
+    for (const id of ids) {
+      const reverted = await revertStudyFields(id)
+      const study = props.studies.find((s) => s.studyInstanceUID === id)
+      if (!study) continue
+      study.patientID = reverted.patientId
+      study.patientName = reverted.patientName
+      study.studyDate = reverted.studyDate.split('-').join('')
+      study.studyDescription = reverted.studyDescription
+      study.modality = reverted.modality
+    }
+  } catch (e) {
+    alert(e instanceof Error ? e.message : 'DICOMタグへの復元に失敗しました')
+  } finally {
+    reverting.value = false
   }
 }
 
@@ -639,6 +666,32 @@ async function handleDeleteChecked() {
 .reorder-error {
   font-size: 0.75rem;
   color: var(--color-danger);
+}
+
+.checked-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.revert-btn {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 5px;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.revert-btn:hover:not(:disabled) {
+  background: var(--color-accent-bg-hover);
+}
+
+.revert-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .delete-selected-btn {

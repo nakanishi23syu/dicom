@@ -212,6 +212,64 @@ public class Mutation
     }
 
     // ======================================================
+    // DICOMタグへの復元
+    // ======================================================
+    // UpdateXxxFieldsAsyncで編集した値を、実際にアップロードされたDICOMファイルのタグ値に戻す。
+    // 「編集前の値」を別カラムに保持しているわけではなく、都度実ファイルを読み直して復元する
+    // （DicomUploadService.RevertXxxTagsAsync参照）。編集権限と対称にするため、
+    // ログイン済みなら誰でも呼べる（[Authorize]のみ、Admin限定にはしない）。
+    [Authorize]
+    public async Task<UserStudy> RevertStudyFieldsAsync(
+        string studyInstanceUid,
+        [Service] DicomDbContext db,
+        [Service] DicomUploadService uploadService)
+    {
+        var study = await db.UserStudies
+            .Include(s => s.Series)
+            .ThenInclude(se => se.Sops)
+            .FirstOrDefaultAsync(s => s.StudyInstanceUid == studyInstanceUid)
+            ?? throw new GraphQLException($"指定された検査が見つかりません: {studyInstanceUid}");
+
+        var anyFilePath = study.Series.SelectMany(se => se.Sops).Select(sop => sop.FilePath).FirstOrDefault()
+            ?? throw new GraphQLException("この検査には画像が1件も無いため、DICOMタグを復元できません。");
+
+        await uploadService.RevertStudyTagsAsync(study, anyFilePath);
+        await db.SaveChangesAsync();
+        return study;
+    }
+
+    [Authorize]
+    public async Task<UserSeries> RevertSeriesFieldsAsync(
+        string seriesInstanceUid,
+        [Service] DicomDbContext db,
+        [Service] DicomUploadService uploadService)
+    {
+        var series = await db.UserSeries
+            .Include(se => se.Sops)
+            .FirstOrDefaultAsync(se => se.SeriesInstanceUid == seriesInstanceUid)
+            ?? throw new GraphQLException($"指定されたシリーズが見つかりません: {seriesInstanceUid}");
+
+        var anyFilePath = series.Sops.Select(sop => sop.FilePath).FirstOrDefault()
+            ?? throw new GraphQLException("このシリーズには画像が1件も無いため、DICOMタグを復元できません。");
+
+        await uploadService.RevertSeriesTagsAsync(series, anyFilePath);
+        await db.SaveChangesAsync();
+        return series;
+    }
+
+    [Authorize]
+    public async Task<UserSop> RevertSopFieldsAsync(
+        string sopInstanceUid,
+        [Service] DicomDbContext db,
+        [Service] DicomUploadService uploadService)
+    {
+        var sop = await FindSopOrThrowAsync(sopInstanceUid, db);
+        await uploadService.RevertSopTagsAsync(sop);
+        await db.SaveChangesAsync();
+        return sop;
+    }
+
+    // ======================================================
     // カスケード削除（指示書2.md要望4）
     // ======================================================
     // DB側の親子削除はEF CoreのOnDelete(Cascade)設定（DicomDbContext参照）に任せ、

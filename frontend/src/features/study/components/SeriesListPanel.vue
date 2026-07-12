@@ -2,7 +2,7 @@
   ======================================================
   SeriesListPanel.vue — 「シリーズリスト」パネル（インライン表示）
   ======================================================
-  SYNAPSE LEADの検査一覧最下部にある「シリーズリスト」を再現したもの。
+  実際のPACS製品の検査一覧最下部にある「シリーズリスト」を再現したもの。
   以前はポップアップモーダル（SeriesModal.vue）で表示していたが、
   実製品に合わせて検査一覧の下に常設パネルとして表示する形に変更した。
 
@@ -32,13 +32,14 @@
           {{ reorder.saveError.value }}
         </span>
       </span>
-      <button
-        v-if="checkable.checkedIds.value.size > 0"
-        class="delete-selected-btn"
-        @click="showDeleteConfirm = true"
-      >
-        🗑 選択した{{ checkable.checkedIds.value.size }}件を削除
-      </button>
+      <span v-if="checkable.checkedIds.value.size > 0" class="checked-actions">
+        <button class="revert-btn" :disabled="reverting" @click="handleRevertChecked">
+          🔄 選択した{{ checkable.checkedIds.value.size }}件をDICOMタグの値に戻す
+        </button>
+        <button class="delete-selected-btn" @click="showDeleteConfirm = true">
+          🗑 選択した{{ checkable.checkedIds.value.size }}件を削除
+        </button>
+      </span>
     </div>
 
     <div class="panel-body">
@@ -174,6 +175,7 @@ import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import {
   reorderSeries,
   updateSeriesFields,
+  revertSeriesFields,
   deleteSeries,
   type SeriesFieldsInput,
 } from '@/services/backendApiService'
@@ -253,6 +255,7 @@ onMounted(() => {
 // ======================================================
 const checkable = useCheckableRows<DicomSeries>((s) => s.seriesInstanceUID)
 const showDeleteConfirm = ref(false)
+const reverting = ref(false)
 
 async function saveField(
   series: DicomSeries,
@@ -266,6 +269,26 @@ async function saveField(
     applyLocal(value)
   } catch (e) {
     alert(e instanceof Error ? e.message : '保存に失敗しました')
+  }
+}
+
+// チェックしたシリーズを、実際のDICOMファイルのタグ値に戻す（インライン編集で上書きした値を破棄する）。
+async function handleRevertChecked() {
+  const ids = [...checkable.checkedIds.value]
+  reverting.value = true
+  try {
+    for (const id of ids) {
+      const reverted = await revertSeriesFields(id)
+      const series = studySeries.value.find((s) => s.seriesInstanceUID === id)
+      if (!series) continue
+      series.seriesNumber = reverted.seriesNumber
+      series.seriesDescription = reverted.seriesDescription
+      series.modality = reverted.modality
+    }
+  } catch (e) {
+    alert(e instanceof Error ? e.message : 'DICOMタグへの復元に失敗しました')
+  } finally {
+    reverting.value = false
   }
 }
 
@@ -343,6 +366,32 @@ async function handleDeleteChecked() {
 .reorder-error {
   font-size: 0.72rem;
   color: var(--color-danger);
+}
+
+.checked-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.revert-btn {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 5px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.revert-btn:hover:not(:disabled) {
+  background: var(--color-accent-bg-hover);
+}
+
+.revert-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .delete-selected-btn {

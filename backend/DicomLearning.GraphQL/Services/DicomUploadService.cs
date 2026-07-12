@@ -161,6 +161,49 @@ public sealed class DicomUploadService(
         }
     }
 
+    // ======================================================
+    // DICOMタグへの復元系（Mutation.RevertStudy/Series/SopFieldsAsync から呼ばれる）
+    // ======================================================
+    // インライン編集（UpdateXxxFieldsAsync）で上書きされた値を、実際のDICOMファイルに
+    // 書かれているタグの値に戻す。DBには「編集前の値」を別途保持していないため、
+    // 実ファイルそのものを都度読み直すことで「タグの値」を取得する
+    // （FilePathはinit専用でアップロード後に変わらないため、常に元のファイルを指している）。
+    public async Task RevertStudyTagsAsync(UserStudy study, string anyRelativeFilePathInStudy)
+    {
+        var ds = await OpenDatasetAsync(anyRelativeFilePathInStudy);
+        study.PatientId = ds.GetSingleValueOrDefault(DicomTag.PatientID, "");
+        study.PatientName = ds.GetSingleValueOrDefault(DicomTag.PatientName, "");
+        if (ds.TryGetSingleValue<DateTime>(DicomTag.StudyDate, out var parsedDate))
+        {
+            study.StudyDate = DateOnly.FromDateTime(parsedDate);
+        }
+        study.StudyDescription = ds.GetSingleValueOrDefault(DicomTag.StudyDescription, "");
+        study.Modality = ds.GetSingleValueOrDefault(DicomTag.Modality, "");
+        study.AccessionNumber = ds.GetSingleValueOrDefault(DicomTag.AccessionNumber, "");
+        study.BodyPartExamined = ds.GetSingleValueOrDefault(DicomTag.BodyPartExamined, "");
+    }
+
+    public async Task RevertSeriesTagsAsync(UserSeries series, string anyRelativeFilePathInSeries)
+    {
+        var ds = await OpenDatasetAsync(anyRelativeFilePathInSeries);
+        series.SeriesNumber = ds.GetSingleValueOrDefault(DicomTag.SeriesNumber, "");
+        series.SeriesDescription = ds.GetSingleValueOrDefault(DicomTag.SeriesDescription, "");
+        series.Modality = ds.GetSingleValueOrDefault(DicomTag.Modality, "");
+    }
+
+    public async Task RevertSopTagsAsync(UserSop sop)
+    {
+        var ds = await OpenDatasetAsync(sop.FilePath);
+        sop.InstanceNumber = ds.GetSingleValueOrDefault(DicomTag.InstanceNumber, "");
+    }
+
+    private async Task<DicomDataset> OpenDatasetAsync(string relativeFilePath)
+    {
+        var fullPath = ResolveFullPath(relativeFilePath);
+        var file = await DicomFile.OpenAsync(fullPath);
+        return file.Dataset;
+    }
+
     private static DicomUploadResult Fail(
         string fileName,
         string message,
