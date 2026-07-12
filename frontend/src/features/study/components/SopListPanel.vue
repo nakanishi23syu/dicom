@@ -27,13 +27,23 @@
           ↺ 適用
         </button>
         <span v-if="reorder.dirty.value" class="dirty-hint">未保存</span>
-        <span v-if="reorder.saveError.value" class="reorder-error">{{ reorder.saveError.value }}</span>
+        <span v-if="reorder.saveError.value" class="reorder-error">
+          {{ reorder.saveError.value }}
+        </span>
       </span>
+      <button
+        v-if="checkable.checkedIds.value.size > 0"
+        class="delete-selected-btn"
+        @click="showDeleteConfirm = true"
+      >
+        🗑 選択した{{ checkable.checkedIds.value.size }}件を削除
+      </button>
     </div>
 
     <table class="sop-table">
       <thead>
         <tr>
+          <th class="check-col" />
           <th class="drag-col" />
           <th>画像番号</th>
           <th>SOP Instance UID</th>
@@ -47,27 +57,60 @@
           :class="{ dragging: draggingIndex === index }"
           v-bind="dragHandlers(index)"
         >
+          <td class="check-col" @click.stop>
+            <input
+              type="checkbox"
+              :checked="checkable.isChecked(instance)"
+              @change="checkable.toggle(instance)"
+            />
+          </td>
           <td class="drag-col">
             <span class="drag-handle" title="ドラッグで並べ替え">⠿</span>
           </td>
-          <td>{{ instance.instanceNumber || '—' }}</td>
+          <td>
+            <input
+              v-if="checkable.isChecked(instance)"
+              class="cell-input"
+              :value="instance.instanceNumber"
+              @click.stop
+              @blur="saveField(instance, $event)"
+            />
+            <template v-else>{{ instance.instanceNumber || '—' }}</template>
+          </td>
           <td class="uid-cell">{{ instance.sopInstanceUID }}</td>
         </tr>
       </tbody>
     </table>
+
+    <!-- チェックしたSOP（画像）の削除確認ポップアップ。DB・実ファイルの両方が削除される。 -->
+    <ConfirmDialog
+      v-model="showDeleteConfirm"
+      title="画像の削除"
+      confirm-text="削除する"
+      @confirm="handleDeleteChecked"
+    >
+      選択した{{ checkable.checkedIds.value.size }}件の画像を削除します。
+      DBのレコードと実ファイルも削除され、元に戻せません。よろしいですか？
+    </ConfirmDialog>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { DicomSeries, DicomInstance } from '@/types/dicom'
 import { useAuthStore } from '@/stores/authStore'
 import { useDragSort } from '@/composables/useDragSort'
 import { useReorderable } from '@/composables/useReorderable'
-import { reorderSops } from '@/services/backendApiService'
+import { useCheckableRows } from '@/composables/useCheckableRows'
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
+import { reorderSops, updateSopFields, deleteSop } from '@/services/backendApiService'
 
 const props = defineProps<{
   series: DicomSeries
+}>()
+
+const emit = defineEmits<{
+  'data-changed': [] // SOP削除・インライン編集の結果を検査一覧側に反映してほしい
 }>()
 
 const authStore = useAuthStore()
@@ -89,6 +132,34 @@ async function handleSaveOrder() {
     await reorder.save(reorderSops)
   } catch {
     // reorder.saveError が画面に表示されるため、ここでは追加のハンドリング不要。
+  }
+}
+
+// ======================================================
+// Notion風チェック→インライン編集・削除（指示書2.md要望4）
+// ======================================================
+const checkable = useCheckableRows<DicomInstance>((i) => i.sopInstanceUID)
+const showDeleteConfirm = ref(false)
+
+async function saveField(instance: DicomInstance, event: Event) {
+  const value = (event.target as HTMLInputElement).value
+  try {
+    await updateSopFields(instance.sopInstanceUID, value)
+    instance.instanceNumber = value
+  } catch (e) {
+    alert(e instanceof Error ? e.message : '保存に失敗しました')
+  }
+}
+
+async function handleDeleteChecked() {
+  const ids = [...checkable.checkedIds.value]
+  try {
+    await Promise.all(ids.map((id) => deleteSop(id)))
+  } catch (e) {
+    alert(e instanceof Error ? e.message : '削除に失敗しました')
+  } finally {
+    checkable.clear()
+    emit('data-changed')
   }
 }
 </script>
@@ -156,6 +227,17 @@ async function handleSaveOrder() {
   color: var(--color-danger);
 }
 
+.delete-selected-btn {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger-border);
+  border-radius: 5px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .sop-table {
   width: 100%;
   border-collapse: collapse;
@@ -178,10 +260,23 @@ async function handleSaveOrder() {
   letter-spacing: 0.04em;
 }
 
+.check-col,
 .drag-col {
   width: 1.5rem;
   padding-left: 0.75rem !important;
   padding-right: 0 !important;
+}
+
+.cell-input {
+  width: 100%;
+  min-width: 4rem;
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-accent);
+  border-radius: 4px;
+  padding: 0.2rem 0.35rem;
+  font-size: 0.8rem;
+  font-family: inherit;
 }
 
 .drag-handle {

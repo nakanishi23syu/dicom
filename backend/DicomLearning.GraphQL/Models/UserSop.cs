@@ -13,9 +13,13 @@ public sealed class UserSop : IOrderable
 {
     public int Id { get; set; }
 
+    // SOP Instance UID・FilePathは実ファイルと直結する不変な値のため編集不可（initのまま）。
     public required string SopInstanceUid { get; init; }
-    public required string InstanceNumber { get; init; }
     public required string FilePath { get; init; }
+
+    // 以下はNotion風インライン編集（指示書2.md要望4）でDICOMタグとの整合性を問わず
+    // 上書きできるようにするため、initではなくsetにしている（Mutation.UpdateSopFieldsAsync参照）。
+    public required string InstanceNumber { get; set; }
 
     // ── 既読/未読フラグ（このプロジェクトの主目的の仮実装） ──
     public bool IsRead { get; set; }

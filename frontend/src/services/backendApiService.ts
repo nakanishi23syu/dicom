@@ -231,3 +231,134 @@ export async function fetchPatientTimeline(patientId: string): Promise<GraphQLSt
   const data = await graphqlRequest<{ patientTimeline: GraphQLStudy[] }>(query, { patientId })
   return data.patientTimeline
 }
+
+// ======================================================
+// インライン編集（Notion風チェック→編集）
+// ======================================================
+// 引数がundefinedの項目はbackend側で「変更しない」扱いになる（Mutation.cs参照）。
+export interface StudyFieldsInput {
+  patientId?: string
+  patientName?: string
+  // "YYYY-MM-DD"形式（HotChocolateがDateOnlyに割り当てるLocalDateスカラー）。
+  // dicomService.mapBackendStudyの逆変換にあたる。
+  studyDate?: string
+  studyDescription?: string
+  modality?: string
+  accessionNumber?: string
+  bodyPartExamined?: string
+}
+
+export async function updateStudyFields(
+  studyInstanceUid: string,
+  fields: StudyFieldsInput
+): Promise<void> {
+  const query = `
+    mutation UpdateStudyFields(
+      $studyInstanceUid: String!
+      $patientId: String
+      $patientName: String
+      $studyDate: LocalDate
+      $studyDescription: String
+      $modality: String
+      $accessionNumber: String
+      $bodyPartExamined: String
+    ) {
+      updateStudyFields(
+        studyInstanceUid: $studyInstanceUid
+        patientId: $patientId
+        patientName: $patientName
+        studyDate: $studyDate
+        studyDescription: $studyDescription
+        modality: $modality
+        accessionNumber: $accessionNumber
+        bodyPartExamined: $bodyPartExamined
+      ) {
+        studyInstanceUid
+      }
+    }
+  `
+  await graphqlRequest<{ updateStudyFields: { studyInstanceUid: string } }>(query, {
+    studyInstanceUid,
+    ...fields,
+  })
+}
+
+export interface SeriesFieldsInput {
+  seriesNumber?: string
+  seriesDescription?: string
+  modality?: string
+}
+
+export async function updateSeriesFields(
+  seriesInstanceUid: string,
+  fields: SeriesFieldsInput
+): Promise<void> {
+  const query = `
+    mutation UpdateSeriesFields(
+      $seriesInstanceUid: String!
+      $seriesNumber: String
+      $seriesDescription: String
+      $modality: String
+    ) {
+      updateSeriesFields(
+        seriesInstanceUid: $seriesInstanceUid
+        seriesNumber: $seriesNumber
+        seriesDescription: $seriesDescription
+        modality: $modality
+      ) {
+        seriesInstanceUid
+      }
+    }
+  `
+  await graphqlRequest<{ updateSeriesFields: { seriesInstanceUid: string } }>(query, {
+    seriesInstanceUid,
+    ...fields,
+  })
+}
+
+export async function updateSopFields(
+  sopInstanceUid: string,
+  instanceNumber: string
+): Promise<void> {
+  const query = `
+    mutation UpdateSopFields($sopInstanceUid: String!, $instanceNumber: String) {
+      updateSopFields(sopInstanceUid: $sopInstanceUid, instanceNumber: $instanceNumber) {
+        sopInstanceUid
+      }
+    }
+  `
+  await graphqlRequest<{ updateSopFields: { sopInstanceUid: string } }>(query, {
+    sopInstanceUid,
+    instanceNumber,
+  })
+}
+
+// ======================================================
+// カスケード削除（DBのレコード＋紐づくDICOMファイルを削除する）
+// ======================================================
+export async function deleteStudy(studyInstanceUid: string): Promise<void> {
+  const query = `
+    mutation DeleteStudy($studyInstanceUid: String!) {
+      deleteStudy(studyInstanceUid: $studyInstanceUid)
+    }
+  `
+  await graphqlRequest<{ deleteStudy: boolean }>(query, { studyInstanceUid })
+}
+
+export async function deleteSeries(seriesInstanceUid: string): Promise<void> {
+  const query = `
+    mutation DeleteSeries($seriesInstanceUid: String!) {
+      deleteSeries(seriesInstanceUid: $seriesInstanceUid)
+    }
+  `
+  await graphqlRequest<{ deleteSeries: boolean }>(query, { seriesInstanceUid })
+}
+
+export async function deleteSop(sopInstanceUid: string): Promise<void> {
+  const query = `
+    mutation DeleteSop($sopInstanceUid: String!) {
+      deleteSop(sopInstanceUid: $sopInstanceUid)
+    }
+  `
+  await graphqlRequest<{ deleteSop: boolean }>(query, { sopInstanceUid })
+}

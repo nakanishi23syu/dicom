@@ -28,14 +28,24 @@
           ↺ 適用
         </button>
         <span v-if="reorder.dirty.value" class="dirty-hint">未保存</span>
-        <span v-if="reorder.saveError.value" class="reorder-error">{{ reorder.saveError.value }}</span>
+        <span v-if="reorder.saveError.value" class="reorder-error">
+          {{ reorder.saveError.value }}
+        </span>
       </span>
+      <button
+        v-if="checkable.checkedIds.value.size > 0"
+        class="delete-selected-btn"
+        @click="showDeleteConfirm = true"
+      >
+        🗑 選択した{{ checkable.checkedIds.value.size }}件を削除
+      </button>
     </div>
 
     <div class="panel-body">
       <table class="series-table">
         <thead>
           <tr>
+            <th class="check-col" />
             <th class="drag-col" />
             <th>シリーズ番号</th>
             <th>モダリティ</th>
@@ -56,13 +66,68 @@
             @click="selectSeries(series)"
             @dblclick="$emit('open-images', series)"
           >
+            <td class="check-col" @click.stop>
+              <input
+                type="checkbox"
+                :checked="checkable.isChecked(series)"
+                @change="checkable.toggle(series)"
+              />
+            </td>
             <td class="drag-col" @click.stop>
               <span class="drag-handle" title="ドラッグで並べ替え">⠿</span>
             </td>
-            <td>{{ series.seriesNumber || '—' }}</td>
-            <td>{{ series.modality || '—' }}</td>
+            <td>
+              <input
+                v-if="checkable.isChecked(series)"
+                class="cell-input"
+                :value="series.seriesNumber"
+                @click.stop
+                @blur="
+                  saveField(
+                    series,
+                    $event,
+                    (v) => ({ seriesNumber: v }),
+                    (v) => (series.seriesNumber = v)
+                  )
+                "
+              />
+              <template v-else>{{ series.seriesNumber || '—' }}</template>
+            </td>
+            <td>
+              <input
+                v-if="checkable.isChecked(series)"
+                class="cell-input"
+                :value="series.modality"
+                @click.stop
+                @blur="
+                  saveField(
+                    series,
+                    $event,
+                    (v) => ({ modality: v }),
+                    (v) => (series.modality = v)
+                  )
+                "
+              />
+              <template v-else>{{ series.modality || '—' }}</template>
+            </td>
             <td>{{ series.numberOfInstances }}</td>
-            <td>{{ series.seriesDescription || '説明なし' }}</td>
+            <td>
+              <input
+                v-if="checkable.isChecked(series)"
+                class="cell-input"
+                :value="series.seriesDescription"
+                @click.stop
+                @blur="
+                  saveField(
+                    series,
+                    $event,
+                    (v) => ({ seriesDescription: v }),
+                    (v) => (series.seriesDescription = v)
+                  )
+                "
+              />
+              <template v-else>{{ series.seriesDescription || '説明なし' }}</template>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -78,7 +143,23 @@
 
     <!-- 選択中シリーズのSOP（画像）一覧。シリーズが変わるたびに:keyで再マウントし、
          前のシリーズの未保存ドラッグ状態を引きずらないようにする。 -->
-    <SopListPanel v-if="selectedSeries" :key="selectedSeries.seriesInstanceUID" :series="selectedSeries" />
+    <SopListPanel
+      v-if="selectedSeries"
+      :key="selectedSeries.seriesInstanceUID"
+      :series="selectedSeries"
+      @data-changed="$emit('data-changed')"
+    />
+
+    <!-- チェックしたシリーズの削除確認ポップアップ。DB・紐づくDICOM画像も削除される。 -->
+    <ConfirmDialog
+      v-model="showDeleteConfirm"
+      title="シリーズの削除"
+      confirm-text="削除する"
+      @confirm="handleDeleteChecked"
+    >
+      選択した{{ checkable.checkedIds.value.size }}件のシリーズを削除します。
+      DBのレコードと紐づくDICOM画像も削除され、元に戻せません。よろしいですか？
+    </ConfirmDialog>
   </section>
 </template>
 
@@ -88,7 +169,14 @@ import { renderDicomToCanvas } from '@/services/dicomService'
 import { useAuthStore } from '@/stores/authStore'
 import { useDragSort } from '@/composables/useDragSort'
 import { useReorderable } from '@/composables/useReorderable'
-import { reorderSeries } from '@/services/backendApiService'
+import { useCheckableRows } from '@/composables/useCheckableRows'
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
+import {
+  reorderSeries,
+  updateSeriesFields,
+  deleteSeries,
+  type SeriesFieldsInput,
+} from '@/services/backendApiService'
 import SopListPanel from './SopListPanel.vue'
 import type { DicomStudy, DicomSeries } from '@/types/dicom'
 
@@ -96,8 +184,9 @@ const props = defineProps<{
   study: DicomStudy
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   'open-images': [series: DicomSeries]
+  'data-changed': [] // シリーズ削除・インライン編集の結果を検査一覧側に反映してほしい
 }>()
 
 const authStore = useAuthStore()
@@ -127,6 +216,15 @@ function selectSeries(series: DicomSeries) {
   selectedSeriesUID.value = series.seriesInstanceUID
 }
 
+// studySeries（親のstudy.series）が再取得等で新しい配列に置き換わったとき、
+// 選択中シリーズがまだ存在するなら新しいオブジェクト参照に差し替える
+// （SOP削除・インライン編集後、SopListPanelへ渡すseries propが古いままにならないようにするため）。
+// 見つからない＝シリーズ自体が削除された場合は選択解除する。
+watch(studySeries, (series) => {
+  if (!selectedSeriesUID.value) return
+  selectedSeries.value = series.find((s) => s.seriesInstanceUID === selectedSeriesUID.value) ?? null
+})
+
 async function renderPreview() {
   thumbnailError.value = false
   const series = selectedSeries.value
@@ -149,6 +247,39 @@ onMounted(() => {
     selectSeries(props.study.series[0])
   }
 })
+
+// ======================================================
+// Notion風チェック→インライン編集・削除（指示書2.md要望4）
+// ======================================================
+const checkable = useCheckableRows<DicomSeries>((s) => s.seriesInstanceUID)
+const showDeleteConfirm = ref(false)
+
+async function saveField(
+  series: DicomSeries,
+  event: Event,
+  toMutationInput: (value: string) => SeriesFieldsInput,
+  applyLocal: (value: string) => void
+) {
+  const value = (event.target as HTMLInputElement).value
+  try {
+    await updateSeriesFields(series.seriesInstanceUID, toMutationInput(value))
+    applyLocal(value)
+  } catch (e) {
+    alert(e instanceof Error ? e.message : '保存に失敗しました')
+  }
+}
+
+async function handleDeleteChecked() {
+  const ids = [...checkable.checkedIds.value]
+  try {
+    await Promise.all(ids.map((id) => deleteSeries(id)))
+  } catch (e) {
+    alert(e instanceof Error ? e.message : '削除に失敗しました')
+  } finally {
+    checkable.clear()
+    emit('data-changed')
+  }
+}
 </script>
 
 <style scoped>
@@ -214,10 +345,34 @@ onMounted(() => {
   color: var(--color-danger);
 }
 
+.delete-selected-btn {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger-border);
+  border-radius: 5px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.check-col,
 .drag-col {
   width: 1.5rem;
   padding-left: 0.75rem !important;
   padding-right: 0 !important;
+}
+
+.cell-input {
+  width: 100%;
+  min-width: 5rem;
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-accent);
+  border-radius: 4px;
+  padding: 0.2rem 0.35rem;
+  font-size: 0.8rem;
+  font-family: inherit;
 }
 
 .drag-handle {

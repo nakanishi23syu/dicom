@@ -6,7 +6,7 @@
   実際のSYNAPSE LEADのタイムライン画面（モダリティごとの行×検査日を横に並べる構成）
   に近づけている。暗いテーマを使っているのも実製品と同じ
   （読影は周囲を暗くした部屋で行うことが多く、暗い画面の方が画像を見やすいため。
-  検査一覧側は .theme-light で明るいテーマにしているのと対照的）。
+  指示書2.md要望3により、現在は検査一覧を含むアプリ全体がこの暗いテーマで統一されている）。
 
   backend/DicomLearning.GraphQL の patientTimeline クエリを使う。
   検査一覧（StudyTable.vue）も同じbackend DBから取得するようになったため、
@@ -24,7 +24,8 @@
         <RouterLink :to="{ name: 'study-list' }" class="back-link">← 検査一覧に戻る</RouterLink>
         <h1>タイムライン</h1>
         <p class="patient-line">
-          患者ID <code>{{ patientId }}</code>
+          患者ID
+          <code>{{ patientId }}</code>
           <span v-if="studies.length > 0">
             　{{ studies[0].patientName }}　{{ formatDate(studies[0].studyDate) }}時点
           </span>

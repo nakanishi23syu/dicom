@@ -9,10 +9,14 @@ public sealed class UserSeries : IOrderable
 {
     public int Id { get; set; }
 
+    // Series Instance UIDはDICOM由来の不変な識別子のため編集不可（initのまま）。
     public required string SeriesInstanceUid { get; init; }
-    public required string SeriesNumber { get; init; }
-    public string SeriesDescription { get; init; } = "";
-    public string Modality { get; init; } = "";
+
+    // 以下はNotion風インライン編集（指示書2.md要望4）でDICOMタグとの整合性を問わず
+    // 上書きできるようにするため、initではなくsetにしている（Mutation.UpdateSeriesFieldsAsync参照）。
+    public required string SeriesNumber { get; set; }
+    public string SeriesDescription { get; set; } = "";
+    public string Modality { get; set; } = "";
 
     // 親（UserStudy）への外部キー
     public int UserStudyId { get; set; }

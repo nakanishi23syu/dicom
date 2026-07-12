@@ -21,7 +21,8 @@
     <div class="filter-sort-toolbar">
       <div class="toolbar-buttons">
         <BaseButton variant="secondary" @click="showFilterPanel = !showFilterPanel">
-          🔍 フィルター<span v-if="filterRules.length">（{{ filterRules.length }}）</span>
+          🔍 フィルター
+          <span v-if="filterRules.length">（{{ filterRules.length }}）</span>
         </BaseButton>
         <span v-if="sort" class="sort-status">
           ↕ {{ FIELD_LABELS[sort.field] }}で{{ sort.direction === 'asc' ? '昇順' : '降順' }}ソート中
@@ -47,8 +48,19 @@
             ↺ 並べ替えを適用
           </button>
           <span v-if="reorder.dirty.value" class="dirty-hint">未保存の変更があります</span>
-          <span v-if="reorder.saveError.value" class="reorder-error">{{ reorder.saveError.value }}</span>
+          <span v-if="reorder.saveError.value" class="reorder-error">
+            {{ reorder.saveError.value }}
+          </span>
         </span>
+
+        <!-- ── Notion風チェック→削除（指示書2.md要望4）── -->
+        <button
+          v-if="checkable.checkedIds.value.size > 0"
+          class="delete-selected-btn"
+          @click="showDeleteConfirm = true"
+        >
+          🗑 選択した{{ checkable.checkedIds.value.size }}件を削除
+        </button>
       </div>
 
       <!-- フィルターパネル: 条件を1つずつ「項目・演算子・値」の3点セットで積み重ねる -->
@@ -106,8 +118,8 @@
 
     <!-- ③ 元データなし -->
     <div v-else-if="studies.length === 0" class="state-msg">
-      <p>DICOMファイルがありません。</p>
-      <p class="hint">public/dicom/ にファイルを配置し、manifest.json に追記してください。</p>
+      <p>検査データがありません。</p>
+      <p class="hint">/upload からDICOMファイルをアップロードしてください。</p>
     </div>
 
     <!-- ④ フィルター条件に一致する検査が0件 -->
@@ -119,6 +131,8 @@
     <table v-else class="study-table">
       <thead>
         <tr>
+          <!-- Notion風チェックボックス用の空列 -->
+          <th class="check-col" />
           <!-- ドラッグハンドル用の空列 -->
           <th class="drag-col" />
           <th class="sortable" @click="toggleSort('patientID')">
@@ -141,7 +155,9 @@
           <th>全検査部位</th>
           <th class="sortable" @click="toggleSort('studyDescription')">
             検査記述
-            <span v-if="sort?.field === 'studyDescription'" class="sort-arrow">{{ sortArrow }}</span>
+            <span v-if="sort?.field === 'studyDescription'" class="sort-arrow">
+              {{ sortArrow }}
+            </span>
           </th>
           <th>シリーズ数</th>
           <th>タイムライン</th>
@@ -178,17 +194,48 @@
           v-bind="!sort ? dragHandlers(index) : {}"
           @click="$emit('select-study', study)"
         >
+          <!-- Notion風チェックボックス。チェックすると同じ行の主要カラムが編集可能になる。 -->
+          <td class="check-col" @click.stop>
+            <input
+              type="checkbox"
+              :checked="checkable.isChecked(study)"
+              @change="checkable.toggle(study)"
+            />
+          </td>
           <!-- ソート中はドラッグでの手動並べ替えができないため、ハンドルを薄く表示するだけにする -->
           <td class="drag-col" :class="{ 'drag-disabled': !!sort }" @click.stop>
-            <span class="drag-handle" :title="sort ? 'ソート解除で手動並べ替え可能' : 'ドラッグで並べ替え'">
+            <span
+              class="drag-handle"
+              :title="sort ? 'ソート解除で手動並べ替え可能' : 'ドラッグで並べ替え'"
+            >
               ⠿
             </span>
           </td>
           <!--
             【|| '—'】 フォールバック
             値が空文字・null・undefined の場合にダッシュ（—）を表示する。
+            チェック中の行だけ<input>に切り替え、blur時にbackendへ保存する
+            （指示書2.md要望4「チェックすると、値編集ができるようにしてほしい」）。
+            @click.stopは<input>自体に付ける（<td>に付けると、非チェック時の
+            通常セルクリックまで行選択(select-study)へのバブリングが止まってしまうため）。
           -->
-          <td>{{ study.patientID || '—' }}</td>
+          <td>
+            <input
+              v-if="checkable.isChecked(study)"
+              class="cell-input"
+              :value="study.patientID"
+              @click.stop
+              @blur="
+                saveField(
+                  study,
+                  $event,
+                  (v) => ({ patientId: v }),
+                  (v) => (study.patientID = v)
+                )
+              "
+            />
+            <template v-else>{{ study.patientID || '—' }}</template>
+          </td>
           <td>
             <!-- ステータスのクリックが行選択（select-study）に伝播しないよう@click.stopで止める -->
             <ReadingStatusBadge
@@ -197,17 +244,80 @@
               @update:status="setStatus(study.studyInstanceUID, $event)"
             />
           </td>
-          <td>{{ study.patientName || '—' }}</td>
+          <td>
+            <input
+              v-if="checkable.isChecked(study)"
+              class="cell-input"
+              :value="study.patientName"
+              @click.stop
+              @blur="
+                saveField(
+                  study,
+                  $event,
+                  (v) => ({ patientName: v }),
+                  (v) => (study.patientName = v)
+                )
+              "
+            />
+            <template v-else>{{ study.patientName || '—' }}</template>
+          </td>
           <!--
             formatDate() を呼んで YYYYMMDD → YYYY/MM/DD に整形する。
             テンプレート内でも関数呼び出しができる。
           -->
-          <td>{{ formatDate(study.studyDate) }}</td>
           <td>
-            <span class="badge">{{ study.modality || '—' }}</span>
+            <input
+              v-if="checkable.isChecked(study)"
+              class="cell-input"
+              type="date"
+              :value="toInputDate(study.studyDate)"
+              @click.stop
+              @blur="
+                saveField(
+                  study,
+                  $event,
+                  (v) => ({ studyDate: v }),
+                  (v) => (study.studyDate = fromInputDate(v))
+                )
+              "
+            />
+            <template v-else>{{ formatDate(study.studyDate) }}</template>
+          </td>
+          <td>
+            <input
+              v-if="checkable.isChecked(study)"
+              class="cell-input"
+              :value="study.modality"
+              @click.stop
+              @blur="
+                saveField(
+                  study,
+                  $event,
+                  (v) => ({ modality: v }),
+                  (v) => (study.modality = v)
+                )
+              "
+            />
+            <span v-else class="badge">{{ study.modality || '—' }}</span>
           </td>
           <td>{{ allBodyParts(study) }}</td>
-          <td>{{ study.studyDescription || '—' }}</td>
+          <td>
+            <input
+              v-if="checkable.isChecked(study)"
+              class="cell-input"
+              :value="study.studyDescription"
+              @click.stop
+              @blur="
+                saveField(
+                  study,
+                  $event,
+                  (v) => ({ studyDescription: v }),
+                  (v) => (study.studyDescription = v)
+                )
+              "
+            />
+            <template v-else>{{ study.studyDescription || '—' }}</template>
+          </td>
           <td>{{ study.series.length }}</td>
           <td>
             <!--
@@ -227,6 +337,17 @@
         </tr>
       </tbody>
     </table>
+
+    <!-- チェックした検査の削除確認ポップアップ。DB・紐づくDICOMファイルの両方が削除される。 -->
+    <ConfirmDialog
+      v-model="showDeleteConfirm"
+      title="検査の削除"
+      confirm-text="削除する"
+      @confirm="handleDeleteChecked"
+    >
+      選択した{{ checkable.checkedIds.value.size }}件の検査を削除します。
+      DBのレコードと紐づくDICOM画像も削除され、元に戻せません。よろしいですか？
+    </ConfirmDialog>
   </div>
 </template>
 
@@ -234,12 +355,19 @@
 import { ref, toRef, computed } from 'vue'
 import type { DicomStudy } from '@/types/dicom'
 import BaseButton from '@/components/common/BaseButton.vue'
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import ReadingStatusBadge from './ReadingStatusBadge.vue'
 import { useReadingStatus } from '@/composables/useReadingStatus'
 import { useDragSort } from '@/composables/useDragSort'
 import { useReorderable } from '@/composables/useReorderable'
+import { useCheckableRows } from '@/composables/useCheckableRows'
 import { useAuthStore } from '@/stores/authStore'
-import { reorderStudies } from '@/services/backendApiService'
+import {
+  reorderStudies,
+  updateStudyFields,
+  deleteStudy,
+  type StudyFieldsInput,
+} from '@/services/backendApiService'
 import {
   useFilterSort,
   operatorNeedsValue,
@@ -266,8 +394,9 @@ const props = defineProps<{
 // Emits（イベント）は子から親にデータを伝える仕組み。
 // Props と Emits で Vue の「単方向データフロー」が成り立つ。
 // 'イベント名': [引数の型] の形式で定義する。
-defineEmits<{
+const emit = defineEmits<{
   'select-study': [study: DicomStudy] // 行クリック時に選択した検査を渡す
+  'data-changed': [] // チェックした検査の削除が完了したので一覧を再取得してほしい
 }>()
 
 // ======================================================
@@ -286,12 +415,7 @@ function formatDate(raw: string): string {
 // Notion風フィルター・ソート（useFilterSort.ts を検査一覧向けに使う）
 // ======================================================
 type StudyFilterField =
-  | 'patientName'
-  | 'patientID'
-  | 'studyDate'
-  | 'studyDescription'
-  | 'modality'
-  | 'accessionNumber'
+  'patientName' | 'patientID' | 'studyDate' | 'studyDescription' | 'modality' | 'accessionNumber'
 
 const FILTER_FIELDS: StudyFilterField[] = [
   'patientName',
@@ -361,8 +485,15 @@ function allBodyParts(study: DicomStudy): string {
 
 const { getStatus, setStatus } = useReadingStatus()
 
-const { filterRules, sort, filteredItems, filteredSortedItems, addFilterRule, removeFilterRule, toggleSort } =
-  useFilterSort<DicomStudy, StudyFilterField>(toRef(props, 'studies'), getFieldValue)
+const {
+  filterRules,
+  sort,
+  filteredItems,
+  filteredSortedItems,
+  addFilterRule,
+  removeFilterRule,
+  toggleSort,
+} = useFilterSort<DicomStudy, StudyFilterField>(toRef(props, 'studies'), getFieldValue)
 
 const showFilterPanel = ref(false)
 
@@ -375,7 +506,11 @@ const sortArrow = computed(() => (sort.value?.direction === 'asc' ? '▲' : '▼
 // （Notion本体も同じ挙動）。ソートが無効なときだけ、フィルター後の一覧を
 // 「DBのOrder順（または未保存のドラッグ結果）」で並べ、ドラッグで並べ替えられるようにする。
 const authStore = useAuthStore()
-const reorder = useReorderable(filteredItems, (s: DicomStudy) => s.studyInstanceUID, (s: DicomStudy) => s.order)
+const reorder = useReorderable(
+  filteredItems,
+  (s: DicomStudy) => s.studyInstanceUID,
+  (s: DicomStudy) => s.order
+)
 
 const { draggingIndex, dragHandlers } = useDragSort(reorder.workingItems)
 
@@ -388,7 +523,45 @@ async function handleSaveOrder() {
 }
 
 // 実際にテーブルへ描画する一覧: ソート中はソート結果、そうでなければドラッグ並べ替え結果。
-const displayedStudies = computed(() => (sort.value ? filteredSortedItems.value : reorder.workingItems.value))
+const displayedStudies = computed(() =>
+  sort.value ? filteredSortedItems.value : reorder.workingItems.value
+)
+
+// ======================================================
+// Notion風チェック→インライン編集・削除（指示書2.md要望4）
+// ======================================================
+const checkable = useCheckableRows<DicomStudy>((s) => s.studyInstanceUID)
+const showDeleteConfirm = ref(false)
+
+// セル1つ分の編集を確定する（inputのblur時に呼ばれる）。
+// toMutationInput: 入力値からbackendへ渡すStudyFieldsInputを組み立てる
+// applyLocal: 保存に成功した場合、表示中のstudyオブジェクトへ直接反映する（一覧の再取得なしで見た目に反映するため）
+async function saveField(
+  study: DicomStudy,
+  event: Event,
+  toMutationInput: (value: string) => StudyFieldsInput,
+  applyLocal: (value: string) => void
+) {
+  const value = (event.target as HTMLInputElement).value
+  try {
+    await updateStudyFields(study.studyInstanceUID, toMutationInput(value))
+    applyLocal(value)
+  } catch (e) {
+    alert(e instanceof Error ? e.message : '保存に失敗しました')
+  }
+}
+
+async function handleDeleteChecked() {
+  const ids = [...checkable.checkedIds.value]
+  try {
+    await Promise.all(ids.map((id) => deleteStudy(id)))
+  } catch (e) {
+    alert(e instanceof Error ? e.message : '削除に失敗しました')
+  } finally {
+    checkable.clear()
+    emit('data-changed')
+  }
+}
 </script>
 
 <!--
@@ -466,6 +639,17 @@ const displayedStudies = computed(() => (sort.value ? filteredSortedItems.value 
 .reorder-error {
   font-size: 0.75rem;
   color: var(--color-danger);
+}
+
+.delete-selected-btn {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger-border);
+  border-radius: 5px;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 .rule-panel {
@@ -559,10 +743,23 @@ const displayedStudies = computed(() => (sort.value ? filteredSortedItems.value 
   font-size: 0.65rem;
 }
 
+.check-col,
 .drag-col {
   width: 1.5rem;
   padding-left: 0.75rem !important;
   padding-right: 0 !important;
+}
+
+.cell-input {
+  width: 100%;
+  min-width: 6rem;
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-accent);
+  border-radius: 4px;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.85rem;
+  font-family: inherit;
 }
 
 .study-table th,

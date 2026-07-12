@@ -68,55 +68,6 @@
   --color-canvas-bg: #000;
 }
 
-/* ======================================================
-   .theme-light — 明るいテーマ（検査一覧などの事務作業画面向け）
-   ======================================================
-   実際のPACS製品（SYNAPSE LEAD）は、検査一覧のような事務作業画面は明るいテーマ、
-   画像を読影するビューア・タイムライン画面は暗いテーマ、と使い分けている
-   （画像診断は周囲を暗くした部屋で行うことが多く、暗い画面の方が画像のコントラストを
-   正しく判断しやすいため）。
-
-   このアプリでも同じ考え方を採用し、ページのルート要素に `class="theme-light"` を
-   付けるだけで、そのページ配下だけ明るい配色に切り替えられるようにしている。
-   CSS変数は「子要素から見て一番近い定義」が使われる性質があるため、
-   :root の暗いテーマ値を、.theme-light 配下でこのブロックの値が上書きする形になる。
-   （コンポーネント側のCSSは var(--color-xxx) を参照しているだけなので、
-   コンポーネントを1つも変更せずにテーマだけ切り替えられる）
-*/
-.theme-light {
-  --color-bg: #f3f5f7;
-  --color-surface: #ffffff;
-  --color-surface-alt: #eef1f4;
-
-  --color-border: #dde2e8;
-  --color-border-strong: #c3cbd4;
-
-  --color-text: #2b333c;
-  --color-text-heading: #12161c;
-  --color-text-muted: #66758a;
-  --color-text-faint: #97a3b0;
-  --color-text-disabled: #b7c0c9;
-
-  --color-accent: #0e9f6e;
-  --color-accent-bg: #e3f6ee;
-  --color-accent-bg-hover: #cdeee0;
-  --color-accent-selected-bg: #d6f5e8;
-  --color-thumbnail-selected-bg: #eafaf3;
-  --color-thumbnail-selected-border: #0e9f6e;
-
-  --color-success: #16a34a;
-  --color-success-bg: #e7f7ec;
-  --color-success-border: #86e0ab;
-  --color-warning: #ca8a04;
-  --color-danger: #dc2626;
-  --color-danger-bg: #fdeaea;
-  --color-danger-border: #f3a8a8;
-
-  --color-purple: #7c3aed;
-  --color-purple-bg: #f1eafe;
-  --color-purple-border: #d3bdfa;
-  --color-purple-code-bg: #ece3fb;
-  --color-purple-code-text: #5b21b6;
-
-  /* 画像用canvasの背景は明るいテーマでも黒のまま（医用画像のコントラストのため）。*/
-}
+/* 以前はここに .theme-light（検査一覧など事務作業画面向けの明るいテーマ）を定義していたが、
+   指示書2.md要望3「画面全体を暗めに、imageViewerのような見た目に」に対応するため廃止した。
+   画像ビューア・タイムラインと統一感を持たせるため、アプリ全体で :root の暗いテーマのみを使う。 */

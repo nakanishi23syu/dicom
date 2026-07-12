@@ -4,7 +4,8 @@
   ======================================================
   実際のPACS製品「SYNAPSE LEAD」のワークリスト画面の構成に近づけている:
     - 左サイドバー（検索プリセット / 分類フォルダ）
-    - 明るいテーマ（.theme-light。画像を読影するビューア/タイムラインは暗いテーマのまま）
+    - 画面全体を暗いテーマに統一（指示書2.md要望3。以前は検査一覧だけ.theme-lightで明るくしていたが、
+      画像ビューア（ImageViewer/SeriesViewer）・タイムラインと統一感を持たせるため廃止した）
     - 検査を選択すると「同一患者IDの全検査」「シリーズリスト」が下に常設表示される
       （以前はポップアップモーダルだったが、実製品に合わせてインラインパネルに変更した）
 
@@ -17,7 +18,7 @@
 -->
 
 <template>
-  <div class="page theme-light">
+  <div class="page">
     <!-- ── ヘッダー ───────────────────────────────────── -->
     <header class="page-header">
       <div class="logo">
@@ -70,6 +71,7 @@
           :error="store.error"
           :selected-u-i-d="selectedStudy?.studyInstanceUID ?? null"
           @select-study="selectedStudy = $event"
+          @data-changed="handleDataChanged"
         />
 
         <!--
@@ -87,6 +89,7 @@
           :key="selectedStudy.studyInstanceUID"
           :study="selectedStudy"
           @open-images="openSeries"
+          @data-changed="handleDataChanged"
         />
       </main>
     </div>
@@ -125,6 +128,18 @@ const selectedStudy = ref<DicomStudy | null>(null)
 // シリーズがダブルクリックされたら、専用の画像ビューアページへ遷移する。
 function openSeries(series: DicomSeries) {
   router.push({ name: 'series-viewer', params: { seriesInstanceUID: series.seriesInstanceUID } })
+}
+
+// チェックした検査・シリーズ・SOPの削除やインライン編集が完了したら一覧を再取得する。
+// シリーズ・SOP削除の場合は選択中の検査自体は存続しているため、選択状態を一律リセットせず
+// 再取得後の同じstudyInstanceUIDのオブジェクトに差し替える（見つからない＝検査自体が
+// 削除された場合はnullになり、パネルが自動的に閉じる）。
+async function handleDataChanged() {
+  const selectedUid = selectedStudy.value?.studyInstanceUID ?? null
+  await store.fetchStudies()
+  selectedStudy.value = selectedUid
+    ? (store.studies.find((s) => s.studyInstanceUID === selectedUid) ?? null)
+    : null
 }
 
 // サイドバーの「全体」を押したら選択状態をリセットする（見た目だけの他項目は今のところ動作なし）。
