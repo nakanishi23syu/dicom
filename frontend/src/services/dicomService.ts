@@ -6,30 +6,21 @@
 // 責務は「外部との通信とデータの変換」だけ。
 //   - fetch でファイルを取得する
 //   - dicom.ts ライブラリでバイナリをパースする
-//   - DICOM タグから Study / Series / Instance の構造に変換する
+//   - GraphQLのレスポンス（backendApiService.ts）を画面用の型（types/dicom.ts）に変換する
 //
 // この層を分離することで:
 //   - ユニットテストが書きやすくなる（Vue の setup が不要）
 //   - ロジックを複数の store / composable から再利用できる
 //   - ライブラリ交換時の影響範囲をここだけに閉じ込められる
+//
+// 検査一覧は以前 public/dicom/manifest.json をブラウザで直接パースする方式だったが、
+// 指示書2.mdの要望（並べ替えのDB永続化・削除のカスケード反映等）に対応するため、
+// backend GraphQL（backendApiService.ts）から取得する方式に切り替えた。
 
 import dicomts from 'dicom.ts'
+import { DICOM_FILE_BASE_URL } from '@/constants/env'
+import type { GraphQLStudy, GraphQLSeries, GraphQLSop } from './backendApiService'
 import type { DicomStudy, DicomSeries, DicomInstance } from '@/types/dicom'
-
-// public/dicom/ のベースパス（Vite は public フォルダをルート "/" で配信する）
-export const DICOM_BASE_PATH = '/dicom/'
-
-// ======================================================
-// fetchManifest — 読み込むファイル名一覧を取得する
-// ======================================================
-// manifest.json は「どの .dcm ファイルを読み込むか」を管理する設定ファイル。
-// ブラウザからディレクトリ一覧は取得できないため、このファイルが必要になる。
-export async function fetchManifest(): Promise<string[]> {
-  const res = await fetch(`${DICOM_BASE_PATH}manifest.json`)
-  if (!res.ok) throw new Error(`manifest.json の取得に失敗しました (HTTP ${res.status})`)
-  const manifest: { files: string[] } = await res.json()
-  return manifest.files
-}
 
 // ======================================================
 // parseDicomFile — .dcm ファイルをパースして DCMImage を返す
@@ -58,113 +49,48 @@ export async function renderDicomToCanvas(
 }
 
 // ======================================================
-// firstTagValue — getTagValue() の戻り値を単一の値に正規化する
+// mapBackendStudy / mapBackendSeries / mapBackendSop
 // ======================================================
-// dicom.ts の getTagValue() は、UI（Unique Identifier）等のVRを持つタグを
-// 値1個であっても配列（例: ["1.2.3..."]）で返すことがある。
-// 配列のまま Map のキーや === 比較に使うと、内容が同じでも
-// 呼び出しごとに別インスタンスの配列になるため一致判定できなくなる
-// （実際にこれが原因で Study のグルーピングが機能しない不具合があった）。
-// そのため、配列で返ってきた場合は最初の要素だけを取り出して使う。
-function firstTagValue(image: ReturnType<typeof dicomts.parseImage>, tag: [number, number]) {
-  const value = image?.getTagValue(tag)
-  return Array.isArray(value) ? value[0] : value
+// backendApiService.ts が返すGraphQLの型（フィールド名がcamelCaseのUid等）を、
+// 画面側コンポーネントが期待する types/dicom.ts の型（DICOM由来の慣習でUID等）に変換する。
+// ここで instance.filePath を「DicomRootからの相対パス」から「backendが配信する完全URL」に
+// 変換しておくことで、SeriesListPanel.vue・ImageViewer.vue 等の描画コードは無修正で動く。
+export function mapBackendStudy(study: GraphQLStudy): DicomStudy {
+  const series = study.series.map(mapBackendSeries)
+  return {
+    studyInstanceUID: study.studyInstanceUid,
+    patientName: study.patientName,
+    patientID: study.patientId,
+    // GraphQLのDateスカラーは "yyyy-MM-dd" で返るため、既存コード（formatDate等）が
+    // 前提とする "yyyyMMdd" の8文字形式に合わせてハイフンを取り除く。
+    studyDate: study.studyDate.split('-').join(''),
+    studyDescription: study.studyDescription,
+    modality: study.modality,
+    accessionNumber: study.accessionNumber,
+    series,
+    filePath: series[0]?.instances[0]?.filePath ?? '',
+    order: study.order,
+  }
 }
 
-// ======================================================
-// normalizeStudyDate — 検査日を必ず "YYYYMMDD" 形式の文字列に揃える
-// ======================================================
-// DicomStudy.studyDate の型は string だが、dicom.ts の image.studyDate は
-// 実行時には Date オブジェクトで返ってくることがある（DICOMのDA型VRをパースした結果）。
-// 文字列を期待する側（StudyTable.vue の formatDate、useFilterSort.ts のフィルター/ソート）が
-// Dateオブジェクトを渡されると壊れる（例: date.localeCompareは存在せず例外になる）ため、
-// データを取り込む時点でここで文字列に統一しておく。
-function normalizeStudyDate(raw: unknown): string {
-  if (raw instanceof Date) {
-    // Dateはローカルタイムゾーンで構築されている前提のため、ローカル時刻のgetterで取り出す
-    // （getUTCFullYear等を使うとタイムゾーンによって日付がずれる）。
-    const year = raw.getFullYear()
-    const month = String(raw.getMonth() + 1).padStart(2, '0')
-    const day = String(raw.getDate()).padStart(2, '0')
-    return `${year}${month}${day}`
+function mapBackendSeries(series: GraphQLSeries): DicomSeries {
+  const instances = series.sops.map(mapBackendSop)
+  return {
+    seriesInstanceUID: series.seriesInstanceUid,
+    seriesNumber: series.seriesNumber,
+    seriesDescription: series.seriesDescription,
+    modality: series.modality,
+    numberOfInstances: instances.length,
+    instances,
+    order: series.order,
   }
-  return typeof raw === 'string' ? raw : ''
 }
 
-// ======================================================
-// loadAllStudies — manifest の全ファイルを解析して Study 構造に変換する
-// ======================================================
-// DICOM の1ファイル = 1インスタンス（画像1枚）。
-// 複数ファイルを Study / Series / Instance の3階層にグルーピングして返す。
-export async function loadAllStudies(): Promise<DicomStudy[]> {
-  const files = await fetchManifest()
-  if (files.length === 0) return []
-
-  // Map<StudyUID, DicomStudy> でグルーピング。
-  // 同じ Study UID を持つファイルが来たとき既存の Study に追記する。
-  const studyMap = new Map<string, DicomStudy>()
-
-  for (const fileName of files) {
-    const filePath = `${DICOM_BASE_PATH}${fileName}`
-
-    // パース失敗したファイルはスキップ（不正なファイルがあっても他に影響しない）
-    const image = await parseDicomFile(filePath).catch(() => null)
-    if (!image) continue
-
-    // ── DICOM タグの読み取り ──────────────────────────────────
-    // タグは [グループ番号, 要素番号] の16進数ペア。
-    // dicom.ts の getTagValue() でタグの値を取得する（型は any なので as でキャスト）。
-    // UID系のタグは配列で返ってくることがあるため firstTagValue() で正規化する。
-
-    const studyUID = (firstTagValue(image, [0x0020, 0x000d]) as string) ?? fileName // (0020,000D) Study Instance UID
-    const studyDesc = (firstTagValue(image, [0x0008, 0x1030]) as string) ?? '' // (0008,1030) Study Description
-    const accessionNum = (firstTagValue(image, [0x0008, 0x0050]) as string) ?? '' // (0008,0050) Accession Number
-    const sopUID = (firstTagValue(image, [0x0008, 0x0018]) as string) ?? '' // (0008,0018) SOP Instance UID
-    const instanceNum = (firstTagValue(image, [0x0020, 0x0013]) as string | number) ?? '' // (0020,0013) Instance Number
-    const seriesUID = image.seriesInstanceUID ?? ''
-
-    // ── Study の登録（初出の UID なら新規作成）──────────────────
-    if (!studyMap.has(studyUID)) {
-      studyMap.set(studyUID, {
-        studyInstanceUID: studyUID,
-        patientName: image.patientName ?? '',
-        patientID: image.patientID ?? '',
-        studyDate: normalizeStudyDate(image.studyDate),
-        studyDescription: studyDesc,
-        modality: image.modality ?? '',
-        accessionNumber: accessionNum,
-        series: [],
-        filePath,
-      })
-    }
-
-    const study = studyMap.get(studyUID)!
-
-    // ── Series の登録（同じ seriesUID がなければ新規作成）──────────
-    let series: DicomSeries | undefined = study.series.find(
-      (s) => s.seriesInstanceUID === seriesUID
-    )
-    if (!series) {
-      series = {
-        seriesInstanceUID: seriesUID,
-        seriesNumber: String(image.seriesNumber ?? ''),
-        seriesDescription: image.seriesDescription ?? '',
-        modality: image.modality ?? '',
-        numberOfInstances: 0,
-        instances: [],
-      }
-      study.series.push(series)
-    }
-
-    // ── Instance（画像1枚）を Series に追加 ────────────────────
-    const instance: DicomInstance = {
-      sopInstanceUID: sopUID,
-      instanceNumber: String(instanceNum),
-      filePath,
-    }
-    series.instances.push(instance)
-    series.numberOfInstances = series.instances.length
+function mapBackendSop(sop: GraphQLSop): DicomInstance {
+  return {
+    sopInstanceUID: sop.sopInstanceUid,
+    instanceNumber: sop.instanceNumber,
+    filePath: `${DICOM_FILE_BASE_URL}/${sop.filePath}`,
+    order: sop.order,
   }
-
-  return Array.from(studyMap.values())
 }

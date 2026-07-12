@@ -9,15 +9,12 @@
   検査一覧側は .theme-light で明るいテーマにしているのと対照的）。
 
   backend/DicomLearning.GraphQL の patientTimeline クエリを使う。
-  検査一覧（StudyTable.vue）はまだ frontend側で public/dicom/manifest.json を
-  直接パースしたデータを表示しており backend DB とは別データのため、
-  「/upload でアップロード済みの患者」でないとここには何も表示されない
-  （アップロードすると同じ患者IDでbackendに登録されるため、そこで初めて繋がる）。
+  検査一覧（StudyTable.vue）も同じbackend DBから取得するようになったため、
+  「backendに登録済みの患者」であれば検査一覧・タイムラインの両方から同じデータが見える。
 
-  実製品は各検査の代表画像をサムネイルとして日付軸上に並べるが、
-  backend側にはまだ「保存済みDICOMファイルを画像として配信するAPI」が無いため
-  （アップロードの保存専用APIはあるが、閲覧用の配信APIは未実装）、
-  ここでは画像の代わりにモダリティ別の色付きブロックで検査を表す。
+  backend側には「保存済みDICOMファイルを画像として配信するAPI」（/dicom-files、
+  Program.cs参照）があるが、このタイムラインは実製品のような代表画像サムネイルではなく、
+  一覧性を優先してモダリティ別の色付きブロックで検査を表す簡易表示のままにしている。
 -->
 
 <template>

@@ -21,6 +21,7 @@ export interface DicomStudy {
   accessionNumber: string // アクセッション番号（RIS/HIS での管理番号）
   series: DicomSeries[] // この検査に含まれるシリーズの配列
   filePath: string // 代表ファイルのパス（検査レベルのサムネイル用）
+  order: number // Notion風ドラッグ&ドロップ並べ替えの表示順（backendのUserStudy.Orderに対応）
 }
 
 // ── シリーズ（Series）─────────────────────────────────
@@ -33,6 +34,7 @@ export interface DicomSeries {
   modality: string // モダリティ（シリーズ単位でも保持）
   numberOfInstances: number // このシリーズに含まれる画像の枚数
   instances: DicomInstance[] // 個々の画像（インスタンス）の配列
+  order: number // Notion風ドラッグ&ドロップ並べ替えの表示順（backendのUserSeries.Orderに対応）
 }
 
 // ── インスタンス（Instance）───────────────────────────
@@ -41,4 +43,5 @@ export interface DicomInstance {
   sopInstanceUID: string // 画像を一意に識別するID（SOP = Service-Object Pair）
   instanceNumber: string // 画像番号（シリーズ内での順番）
   filePath: string // ブラウザからアクセスできるファイルパス
+  order: number // Notion風ドラッグ&ドロップ並べ替えの表示順（backendのUserSop.Orderに対応）
 }

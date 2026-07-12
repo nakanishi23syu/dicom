@@ -28,6 +28,27 @@
           <button class="sort-clear" @click="sort = null">解除</button>
         </span>
         <span v-else class="sort-hint">列見出しをクリックするとソートできます</span>
+
+        <!--
+          ── 並べ替え保存・適用（Notion風ドラッグ&ドロップの永続化）──
+          保存: 現在のドラッグ結果をDBのOrderカラムへ書き込む（管理者のみ）。
+          適用: DBに保存済みのOrder順に表示を戻す（未保存のドラッグ結果を破棄する）。
+        -->
+        <span class="reorder-actions">
+          <button
+            class="reorder-btn"
+            :disabled="!authStore.isAdmin || reorder.saving.value"
+            :title="authStore.isAdmin ? '現在の並び順をDBに保存します' : '管理者のみ保存できます'"
+            @click="handleSaveOrder"
+          >
+            💾 並べ替えを保存
+          </button>
+          <button class="reorder-btn" :disabled="reorder.saving.value" @click="reorder.apply()">
+            ↺ 並べ替えを適用
+          </button>
+          <span v-if="reorder.dirty.value" class="dirty-hint">未保存の変更があります</span>
+          <span v-if="reorder.saveError.value" class="reorder-error">{{ reorder.saveError.value }}</span>
+        </span>
       </div>
 
       <!-- フィルターパネル: 条件を1つずつ「項目・演算子・値」の3点セットで積み重ねる -->
@@ -210,13 +231,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, computed, watch } from 'vue'
+import { ref, toRef, computed } from 'vue'
 import type { DicomStudy } from '@/types/dicom'
 import BaseButton from '@/components/common/BaseButton.vue'
 import ReadingStatusBadge from './ReadingStatusBadge.vue'
 import { useReadingStatus } from '@/composables/useReadingStatus'
 import { useDragSort } from '@/composables/useDragSort'
-import { useManualOrder } from '@/composables/useManualOrder'
+import { useReorderable } from '@/composables/useReorderable'
+import { useAuthStore } from '@/stores/authStore'
+import { reorderStudies } from '@/services/backendApiService'
 import {
   useFilterSort,
   operatorNeedsValue,
@@ -346,34 +369,26 @@ const showFilterPanel = ref(false)
 const sortArrow = computed(() => (sort.value?.direction === 'asc' ? '▲' : '▼'))
 
 // ======================================================
-// Notion風ドラッグ&ドロップでの手動並べ替え
+// Notion風ドラッグ&ドロップでの並べ替え（DBのOrderカラムに保存・適用する）
 // ======================================================
-// ソートが有効な間は表示順がソート結果で決まるため、手動並べ替えの対象にはしない
+// ソートが有効な間は表示順がソート結果で決まるため、ドラッグ並べ替えの対象にはしない
 // （Notion本体も同じ挙動）。ソートが無効なときだけ、フィルター後の一覧を
-// 「保存済みの手動順」で並べ、ドラッグで並べ替えられるようにする。
-const { applyManualOrder, setOrder } = useManualOrder('study-list')
+// 「DBのOrder順（または未保存のドラッグ結果）」で並べ、ドラッグで並べ替えられるようにする。
+const authStore = useAuthStore()
+const reorder = useReorderable(filteredItems, (s: DicomStudy) => s.studyInstanceUID, (s: DicomStudy) => s.order)
 
-// useDragSortが直接書き換えられるよう、実体を持つrefとして持つ
-// （filteredSortedItems等のcomputedは読み取り専用のため直接は使えない）。
-const manualOrderedStudies = ref<DicomStudy[]>([])
+const { draggingIndex, dragHandlers } = useDragSort(reorder.workingItems)
 
-watch(
-  filteredItems,
-  (items) => {
-    manualOrderedStudies.value = applyManualOrder(items, (s) => s.studyInstanceUID)
-  },
-  { immediate: true }
-)
+async function handleSaveOrder() {
+  try {
+    await reorder.save(reorderStudies)
+  } catch {
+    // reorder.saveError が画面に表示されるため、ここでは追加のハンドリング不要。
+  }
+}
 
-const { draggingIndex, dragHandlers } = useDragSort(manualOrderedStudies)
-
-// ドラッグでの並べ替え結果が変わるたびに保存する（ソート中はドラッグ自体が無効なので発火しない）。
-watch(manualOrderedStudies, (items) => {
-  setOrder(items, (s) => s.studyInstanceUID)
-})
-
-// 実際にテーブルへ描画する一覧: ソート中はソート結果、そうでなければ手動並び順。
-const displayedStudies = computed(() => (sort.value ? filteredSortedItems.value : manualOrderedStudies.value))
+// 実際にテーブルへ描画する一覧: ソート中はソート結果、そうでなければドラッグ並べ替え結果。
+const displayedStudies = computed(() => (sort.value ? filteredSortedItems.value : reorder.workingItems.value))
 </script>
 
 <!--
@@ -413,6 +428,44 @@ const displayedStudies = computed(() => (sort.value ? filteredSortedItems.value 
 .sort-hint {
   font-size: 0.76rem;
   color: var(--color-text-faint);
+}
+
+.reorder-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.reorder-btn {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 5px;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.reorder-btn:hover:not(:disabled) {
+  background: var(--color-accent-bg-hover);
+}
+
+.reorder-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dirty-hint {
+  font-size: 0.75rem;
+  color: var(--color-warning);
+  white-space: nowrap;
+}
+
+.reorder-error {
+  font-size: 0.75rem;
+  color: var(--color-danger);
 }
 
 .rule-panel {

@@ -5,7 +5,9 @@ using DicomLearning.GraphQL.GraphQL;
 using DicomLearning.GraphQL.Services;
 using DicomLearning.GraphQL.Configuration;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -97,6 +99,28 @@ builder.Services
 var app = builder.Build();
 
 app.UseCors(AppConstants.FrontendCorsPolicy);
+
+// ======================================================
+// DICOM画像配信（静的ファイル配信）
+// ======================================================
+// アップロード保存先（Storage:DicomRoot 配下）を "/dicom-files" に直接マウントして配信する。
+// フロントのcanvas描画（dicom.ts経由のfetch）はここからファイル本体を取得し、
+// GraphQL側はメタデータ（UserSop.FilePath等）だけを扱う。
+var dicomStorageOptions = builder.Configuration.GetSection("Storage").Get<DicomStorageOptions>()
+    ?? new DicomStorageOptions();
+var dicomRootFullPath = System.IO.Path.Combine(builder.Environment.ContentRootPath, dicomStorageOptions.DicomRoot);
+Directory.CreateDirectory(dicomRootFullPath);
+// ".dcm" はASP.NET Core既定のFileExtensionContentTypeProviderに登録が無く、
+// 既定設定のままだと「Content-Typeを判定できないファイルは404にする」挙動によりDICOMファイルが
+// 一切配信されない（ServeUnknownFileTypesの既定値はfalse）。".dcm"のMIMEタイプを明示的に追加して解決する。
+var dicomContentTypeProvider = new FileExtensionContentTypeProvider();
+dicomContentTypeProvider.Mappings[".dcm"] = "application/dicom";
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(dicomRootFullPath),
+    RequestPath = "/dicom-files",
+    ContentTypeProvider = dicomContentTypeProvider,
+});
 
 // UseAuthentication（「誰か」を判定）→ UseAuthorization（「その人に権限があるか」を判定）の順で登録する。
 // この順序を逆にすると認可判定の時点でユーザー情報が確定しておらず正しく動作しない。

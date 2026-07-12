@@ -14,3 +14,8 @@ export const GRAPHQL_ENDPOINT =
 // `/api/dicom-upload` に対応）。GraphQLエンドポイントと同じホスト・ポートなので、
 // 別の環境変数を増やして値がズレる事故を避けるため、GRAPHQL_ENDPOINTから機械的に導出する。
 export const DICOM_UPLOAD_ENDPOINT = GRAPHQL_ENDPOINT.replace(/\/graphql$/, '/api/dicom-upload')
+
+// アップロード済みDICOMファイル本体を配信する静的ファイルのベースURL（Program.cs の
+// `app.UseStaticFiles(... RequestPath = "/dicom-files")` に対応）。
+// `UserSop.filePath`（DicomRootからの相対パス）の手前にこれを連結してfetch用URLを組み立てる。
+export const DICOM_FILE_BASE_URL = GRAPHQL_ENDPOINT.replace(/\/graphql$/, '/dicom-files')

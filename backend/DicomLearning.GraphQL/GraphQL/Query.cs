@@ -32,16 +32,19 @@ namespace DicomLearning.GraphQL.GraphQL;
 // 将来アクセスが増えた場合は HotChocolate 同梱の GreenDonut を検討する）。
 public class Query
 {
+    // 「サイトアクセス時はDBのorder順」（指示書2.md 要望2）を満たすため、Study/Series/Sopのいずれも
+    // Orderカラム昇順で返す。Include内にOrderByを書くと、そのネストしたコレクション自体も
+    // その順序で読み込まれる（EF Core 5+の機能。Include後にToListAsync側でOrderByし直す必要がない）。
     public async Task<List<UserStudy>> GetStudiesAsync([Service] DicomDbContext db) =>
         await db.UserStudies
-            .Include(s => s.Series)
-            .ThenInclude(se => se.Sops)
-            .OrderByDescending(s => s.StudyDate)
+            .Include(s => s.Series.OrderBy(se => se.Order))
+            .ThenInclude(se => se.Sops.OrderBy(sop => sop.Order))
+            .OrderBy(s => s.Order)
             .ToListAsync();
 
     public async Task<UserSeries?> GetSeriesAsync(string seriesInstanceUid, [Service] DicomDbContext db) =>
         await db.UserSeries
-            .Include(se => se.Sops)
+            .Include(se => se.Sops.OrderBy(sop => sop.Order))
             .FirstOrDefaultAsync(se => se.SeriesInstanceUid == seriesInstanceUid);
 
     // ── 関連用語集.md の「タイムラインビュー」を模したクエリ ──

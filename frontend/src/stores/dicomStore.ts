@@ -16,7 +16,8 @@
 
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import { loadAllStudies } from '@/services/dicomService'
+import { fetchStudies as fetchStudiesFromBackend } from '@/services/backendApiService'
+import { mapBackendStudy } from '@/services/dicomService'
 import type { DicomStudy } from '@/types/dicom'
 
 // ======================================================
@@ -42,16 +43,15 @@ export const useDicomStore = defineStore('dicom', () => {
   // Store 内で定義した関数が Action になる。
   // 非同期処理も普通に async/await で書ける（Vuex と違ってシンプル）。
 
-  // fetchStudies — サービス層を呼び出して studies を更新する
+  // fetchStudies — backendのGraphQLから検査一覧を取得し、画面用の型に変換して格納する
   async function fetchStudies() {
     loading.value = true
     error.value = null
     try {
-      // loadAllStudies() はサービス層の純粋関数。
-      // 結果を store の ref にセットすると、参照しているコンポーネントが再描画される。
-      studies.value = await loadAllStudies()
+      const backendStudies = await fetchStudiesFromBackend()
+      studies.value = backendStudies.map(mapBackendStudy)
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'DICOMファイルの読み込みに失敗しました'
+      error.value = e instanceof Error ? e.message : '検査データの読み込みに失敗しました'
     } finally {
       loading.value = false
     }

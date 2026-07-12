@@ -15,12 +15,28 @@
     <div class="panel-header">
       <span class="panel-title">▼ シリーズリスト</span>
       <span class="panel-count">件数：{{ study.series.length }}</span>
+      <span class="reorder-actions">
+        <button
+          class="reorder-btn"
+          :disabled="!authStore.isAdmin || reorder.saving.value"
+          :title="authStore.isAdmin ? '現在の並び順をDBに保存します' : '管理者のみ保存できます'"
+          @click="handleSaveOrder"
+        >
+          💾 保存
+        </button>
+        <button class="reorder-btn" :disabled="reorder.saving.value" @click="reorder.apply()">
+          ↺ 適用
+        </button>
+        <span v-if="reorder.dirty.value" class="dirty-hint">未保存</span>
+        <span v-if="reorder.saveError.value" class="reorder-error">{{ reorder.saveError.value }}</span>
+      </span>
     </div>
 
     <div class="panel-body">
       <table class="series-table">
         <thead>
           <tr>
+            <th class="drag-col" />
             <th>シリーズ番号</th>
             <th>モダリティ</th>
             <th>画像数</th>
@@ -29,13 +45,20 @@
         </thead>
         <tbody>
           <tr
-            v-for="series in study.series"
+            v-for="(series, index) in reorder.workingItems.value"
             :key="series.seriesInstanceUID"
             class="series-row"
-            :class="{ selected: series.seriesInstanceUID === selectedSeriesUID }"
+            :class="{
+              selected: series.seriesInstanceUID === selectedSeriesUID,
+              dragging: draggingIndex === index,
+            }"
+            v-bind="dragHandlers(index)"
             @click="selectSeries(series)"
             @dblclick="$emit('open-images', series)"
           >
+            <td class="drag-col" @click.stop>
+              <span class="drag-handle" title="ドラッグで並べ替え">⠿</span>
+            </td>
             <td>{{ series.seriesNumber || '—' }}</td>
             <td>{{ series.modality || '—' }}</td>
             <td>{{ series.numberOfInstances }}</td>
@@ -52,12 +75,21 @@
         <p class="preview-caption">ダブルクリックで画像を開く</p>
       </div>
     </div>
+
+    <!-- 選択中シリーズのSOP（画像）一覧。シリーズが変わるたびに:keyで再マウントし、
+         前のシリーズの未保存ドラッグ状態を引きずらないようにする。 -->
+    <SopListPanel v-if="selectedSeries" :key="selectedSeries.seriesInstanceUID" :series="selectedSeries" />
   </section>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { renderDicomToCanvas } from '@/services/dicomService'
+import { useAuthStore } from '@/stores/authStore'
+import { useDragSort } from '@/composables/useDragSort'
+import { useReorderable } from '@/composables/useReorderable'
+import { reorderSeries } from '@/services/backendApiService'
+import SopListPanel from './SopListPanel.vue'
 import type { DicomStudy, DicomSeries } from '@/types/dicom'
 
 const props = defineProps<{
@@ -67,6 +99,23 @@ const props = defineProps<{
 defineEmits<{
   'open-images': [series: DicomSeries]
 }>()
+
+const authStore = useAuthStore()
+const studySeries = computed(() => props.study.series)
+const reorder = useReorderable(
+  studySeries,
+  (s: DicomSeries) => s.seriesInstanceUID,
+  (s: DicomSeries) => s.order
+)
+const { draggingIndex, dragHandlers } = useDragSort(reorder.workingItems)
+
+async function handleSaveOrder() {
+  try {
+    await reorder.save(reorderSeries)
+  } catch {
+    // reorder.saveError が画面に表示されるため、ここでは追加のハンドリング不要。
+  }
+}
 
 const selectedSeries = ref<DicomSeries | null>(null)
 const selectedSeriesUID = ref<string | null>(null)
@@ -123,9 +172,61 @@ onMounted(() => {
 }
 
 .panel-count {
-  margin-left: auto;
   font-size: 0.75rem;
   color: var(--color-text-faint);
+}
+
+.reorder-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.reorder-btn {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 5px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.reorder-btn:hover:not(:disabled) {
+  background: var(--color-accent-bg-hover);
+}
+
+.reorder-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dirty-hint {
+  font-size: 0.72rem;
+  color: var(--color-warning);
+  white-space: nowrap;
+}
+
+.reorder-error {
+  font-size: 0.72rem;
+  color: var(--color-danger);
+}
+
+.drag-col {
+  width: 1.5rem;
+  padding-left: 0.75rem !important;
+  padding-right: 0 !important;
+}
+
+.drag-handle {
+  color: var(--color-text-faint);
+  cursor: grab;
+}
+
+.series-row.dragging {
+  opacity: 0.4;
 }
 
 .panel-body {

@@ -89,19 +89,21 @@ public sealed class DicomUploadService(
         }
 
         var sopOrder = await db.UserSops.CountAsync(sop => sop.UserSeriesId == series.Id);
-        var filePath = BuildStoragePath(studyUid, seriesUid, sopUid);
+        // DB上のFilePathはDicomRootからの相対パスのみを持つ（Storage設定を変更しても
+        // 過去データのURLが壊れないようにするため。実ディスクへの保存パスはここで別途組み立てる）。
+        var relativePath = BuildRelativePath(studyUid, seriesUid, sopUid);
 
         var sop = new UserSop
         {
             SopInstanceUid = sopUid,
             InstanceNumber = ds.GetSingleValueOrDefault(DicomTag.InstanceNumber, ""),
-            FilePath = filePath,
+            FilePath = relativePath,
             IsRead = false,
             Order = sopOrder,
         };
         series.Sops.Add(sop);
 
-        var fullPath = System.IO.Path.Combine(env.ContentRootPath, filePath);
+        var fullPath = ResolveFullPath(relativePath);
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(fullPath)!);
         await dicomFile.SaveAsync(fullPath);
 
@@ -118,11 +120,46 @@ public sealed class DicomUploadService(
         };
     }
 
-    // ストレージ上のパス（DB保存用の相対パス）: {DicomRoot}/{StudyUID}/{SeriesUID}/{SopUID}.dcm
+    // DB保存用の相対パス（DicomRootを起点とした相対パス）: {StudyUID}/{SeriesUID}/{SopUID}.dcm
     // DB上は常にスラッシュ区切りで統一する（Path.Combineの結果はWindowsだとバックスラッシュになるため）。
-    // 実ファイルへの書き込みパス（fullPath）はOS標準の区切りで問題ないので、そちらはPath.Combineのまま使う。
-    private string BuildStoragePath(string studyUid, string seriesUid, string sopUid) =>
-        string.Join('/', storageOptions.Value.DicomRoot, studyUid, seriesUid, $"{sopUid}.dcm");
+    private static string BuildRelativePath(string studyUid, string seriesUid, string sopUid) =>
+        string.Join('/', studyUid, seriesUid, $"{sopUid}.dcm");
+
+    // 相対パス→実ディスクパスの変換（保存・削除の両方から使う）。
+    private string ResolveFullPath(string relativePath) =>
+        System.IO.Path.Combine(env.ContentRootPath, storageOptions.Value.DicomRoot, relativePath);
+
+    // ======================================================
+    // 削除系（Mutation.DeleteStudy/DeleteSeries/DeleteSopAsync から呼ばれる）
+    // ======================================================
+    // DB側の削除はEF CoreのCascade設定に任せ、こちらはディスク上の実ファイルだけを消す。
+    // 既に手動で消されている等でファイルが無くても例外にしない（削除の目的は達成されているため）。
+    public void DeleteStudyFiles(string studyUid)
+    {
+        var dir = System.IO.Path.Combine(env.ContentRootPath, storageOptions.Value.DicomRoot, studyUid);
+        if (Directory.Exists(dir))
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    public void DeleteSeriesFiles(string studyUid, string seriesUid)
+    {
+        var dir = System.IO.Path.Combine(env.ContentRootPath, storageOptions.Value.DicomRoot, studyUid, seriesUid);
+        if (Directory.Exists(dir))
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    public void DeleteSopFile(string relativeFilePath)
+    {
+        var fullPath = ResolveFullPath(relativeFilePath);
+        if (File.Exists(fullPath))
+        {
+            File.Delete(fullPath);
+        }
+    }
 
     private static DicomUploadResult Fail(
         string fileName,
