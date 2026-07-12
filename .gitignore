@@ -29,6 +29,9 @@ backend/**/*.db-wal
 # アップロードされたDICOMファイルの保存先（アプリデータのため）
 backend/**/Storage/
 
+# アップロード動作確認用にルート直下へ置くDICOMサンプルファイル（テスト用のため）
+/*.dcm
+
 # OS が自動生成するファイル
 .DS_Store
 Thumbs.db
