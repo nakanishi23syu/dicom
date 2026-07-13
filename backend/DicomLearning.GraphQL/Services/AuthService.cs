@@ -16,6 +16,19 @@ namespace DicomLearning.GraphQL.Services;
 // パスワードの扱い（ハッシュ化・照合）とトークンの発行ロジックは、
 // Mutation.cs に直接書くと肥大化しテストもしづらい。
 // 「認証」という1つの関心事としてこのクラスにまとめている。
+//
+// クラス名の後ろの (IOptions<JwtOptions> jwtOptions) は「プライマリコンストラクタ」という
+// C# 12の構文。普通のコンストラクタ＋privateフィールドを省略して書けるもので、
+// jwtOptions はクラス内のどのメソッドからも使えるフィールドとして扱われる
+// （詳細はDicomUploadService.csの同種コメントを参照）。
+//
+// 【IOptions&lt;JwtOptions&gt; とは】
+// appsettings.json の "Jwt" セクションの値をC#オブジェクトとして受け取るための、
+// ASP.NET Core標準の「Optionsパターン」。Program.cs 側で
+//   builder.Services.Configure&lt;JwtOptions&gt;(jwtSection);
+// と登録しておくと、jwtOptions.Value で appsettings.json の値（Issuer/Audience/SigningKey等）
+// が読める状態でDIコンテナから渡ってくる（＝設定ファイルの値を直接new JwtOptions()するのではなく、
+// IOptions越しに取得するのがASP.NET Coreの慣習）。
 public sealed class AuthService(IOptions<JwtOptions> jwtOptions)
 {
     // PasswordHasher<T> はASP.NET Coreに同梱されているハッシュ化ユーティリティ

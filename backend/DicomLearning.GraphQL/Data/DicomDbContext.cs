@@ -8,6 +8,21 @@ namespace DicomLearning.GraphQL.Data;
 // ======================================================
 // Program.cs で Scoped として DI コンテナに登録する（AddDbContext の既定ライフタイム）。
 // GraphQLのリクエスト1件ごとに新しいインスタンスが払い出される。
+//
+// 【 (DbContextOptions<DicomDbContext> options) : DbContext(options) の意味】
+// これもプライマリコンストラクタ（DicomUploadService.csの解説を参照）だが、
+// 末尾に ": DbContext(options)" が付いている点が異なる。これは
+// 「受け取った options を、そのまま基底クラス DbContext のコンストラクタに渡す」という意味。
+// つまり通常のコンストラクタで書くと以下と同じ:
+//
+//   public sealed class DicomDbContext : DbContext
+//   {
+//       public DicomDbContext(DbContextOptions<DicomDbContext> options) : base(options) { }
+//   }
+//
+// DbContextOptions&lt;DicomDbContext&gt; の中身（SQLiteを使う・接続文字列は何か等）は
+// Program.cs の `builder.Services.AddDbContext<DicomDbContext>(options => options.UseSqlite(...))`
+// で組み立てられ、DIコンテナ経由でここに渡ってくる。
 public sealed class DicomDbContext(DbContextOptions<DicomDbContext> options) : DbContext(options)
 {
     public DbSet<UserStudy> UserStudies => Set<UserStudy>();

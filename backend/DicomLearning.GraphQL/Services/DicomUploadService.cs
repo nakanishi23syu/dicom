@@ -18,6 +18,31 @@ namespace DicomLearning.GraphQL.Services;
 // 1枚目で作成したStudy/Seriesを再利用する必要があるため、
 // 呼び出し側（DicomUploadEndpoints）は1ファイル処理するごとに SaveChangesAsync している
 // （そうしないと、2枚目の検索時にまだDB未反映の1枚目のStudyが見つからない）。
+//
+// 【クラス名の後ろの (DicomDbContext db, ...) は何か ―― プライマリコンストラクタ】
+// これはC# 12で追加された糖衣構文（"プライマリコンストラクタ"）で、下のコードと完全に同じ意味になる:
+//
+//   public sealed class DicomUploadService
+//   {
+//       private readonly DicomDbContext db;
+//       private readonly IOptions<DicomStorageOptions> storageOptions;
+//       private readonly IHostEnvironment env;
+//
+//       public DicomUploadService(DicomDbContext db, IOptions<DicomStorageOptions> storageOptions, IHostEnvironment env)
+//       {
+//           this.db = db;
+//           this.storageOptions = storageOptions;
+//           this.env = env;
+//       }
+//   }
+//
+// つまり db / storageOptions / env は「フィールドに保存されたコンストラクタ引数」であり、
+// クラス内のどのメソッドからでもそのまま使える（下のメソッド内で db.UserSops のように
+// 何の前置きもなく登場しているのはこのため）。
+// 実際にこの3つの引数を渡してインスタンスを作るのはDIコンテナ側
+// （Program.cs の `builder.Services.AddScoped<DicomUploadService>();`）であり、
+// DicomDbContext・IOptions&lt;DicomStorageOptions&gt;・IHostEnvironment がいずれも
+// DIコンテナに登録済みの型だからこそ、自動的に解決してnewしてもらえる。
 public sealed class DicomUploadService(
     DicomDbContext db,
     IOptions<DicomStorageOptions> storageOptions,

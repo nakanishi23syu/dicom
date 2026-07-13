@@ -10,6 +10,27 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 
+// ======================================================
+// このファイル(Program.cs)の全体像 ― ASP.NET Coreアプリの「起動スクリプト」
+// ======================================================
+// ASP.NET Coreのアプリは、大きく2段階の手続きで組み立てる。
+//
+//   ① builder.Services.AddXxx(...)   … "DIコンテナ" に「この型が欲しくなったら
+//        こうやって作ってね」というレシピを登録するフェーズ（99行目の builder.Build() まで）。
+//        ここで登録した型は、後からコンストラクタの引数やメソッドの引数に
+//        "その型をただ書くだけ" で自動的にインスタンスが渡ってくるようになる。
+//        これが「DI（Dependency Injection / 依存性の注入）」で、ASP.NET Core全体の土台となる仕組み。
+//
+//   ② app.UseXxx(...) / app.MapXxx(...)  … 実際にHTTPリクエストが来たときに
+//        「どんな順番で処理するか」というパイプライン（流れ作業のライン）を組み立てるフェーズ
+//        （99行目の builder.Build() 以降）。
+//        UseXxx は「全リクエストに共通で通す処理」（認証チェックなど）を追加し、
+//        MapXxx は「このURLパスに来たらこの処理を実行する」というルーティングを登録する。
+//
+// ①と②は完全に別物で、①でDIコンテナに登録していない型は②のどこでも自動注入できない、
+// という関係になっている（例: 38行目で AddScoped<DicomUploadService>() と登録しているからこそ、
+// 155行目の MapPost のラムダ引数に DicomUploadService uploadService と書くだけで
+// 実体が渡ってくる。詳細は155行目のコメントを参照）。
 var builder = WebApplication.CreateBuilder(args);
 
 // ======================================================
@@ -28,6 +49,14 @@ builder.WebHost.ConfigureKestrel(options =>
 // ======================================================
 // DIコンテナへの登録
 // ======================================================
+// AddXxx系メソッドの名前についている "Scoped" は、そのサービスが
+// 「いつインスタンスを使い回すか」という寿命（ライフタイム）を表す。3種類ある:
+//   - AddSingleton … アプリ起動から終了まで、ずっと同じ1個のインスタンスを使い回す。
+//   - AddScoped    … リクエスト1件（GraphQLなら1クエリ/1ミューテーション）ごとに新しいインスタンス。
+//                     同じリクエスト内で複数回注入されても同じインスタンスが渡る。
+//   - AddTransient … 注入されるたびに毎回新しいインスタンス。
+// DbContext（DB接続を持つ）はリクエストをまたいで使い回すと事故りやすいため Scoped が定石。
+//
 // DicomDbContext は SQLite（appsettings.json の ConnectionStrings:Dicom）に永続化するDbContext。
 // AddDbContext は既定で Scoped 登録される＝GraphQLのリクエスト1件ごとに新しいインスタンスが使われる。
 builder.Services.AddDbContext<DicomDbContext>(options =>
@@ -152,6 +181,24 @@ app.MapGraphQL();
 // 素の `multipart/form-data` POSTで十分かつシンプルなため、ここだけ通常のHTTP APIにしている。
 // フロントエンドからは `FormData` に複数ファイルを詰めてPOSTする想定
 // （frontend/src/services/uploadService.ts を参照）。
+//
+// 【DicomUploadService uploadService はどこからやってくるのか】
+// これは "Minimal API のパラメータバインディング" という機能で、書いた覚えがなくても
+// 自動的に実体（インスタンス）が渡ってくる。仕組みは次の通り:
+//
+//   1. app.MapPost(パス, ラムダ式) と書くと、ASP.NET Coreはこのラムダの引数を1個ずつ見て、
+//      「HTTPリクエストの中身（クエリ文字列やボディ）から取れる型」と
+//      「DIコンテナに登録されているサービスの型」を自動判別する。
+//      HttpRequest はASP.NET Core組み込みの特別な型なのでリクエストそのものが渡され、
+//      DicomUploadService は組み込み型でもプリミティブ型でもないため「DIコンテナから取る」と判断される。
+//   2. DIコンテナには 38行目の `builder.Services.AddScoped<DicomUploadService>();` で
+//      「DicomUploadServiceが要求されたら、コンストラクタの引数(DicomDbContext等)も
+//      芋づる式に解決してnewしてね」というレシピが事前に登録済み。
+//   3. リクエストが来るたびに、そのレシピに従って新しい DicomUploadService インスタンスが
+//      作られ（Scoped＝リクエスト1件につき1つ）、この uploadService 引数に渡される。
+//
+// つまり「38行目で登録 → 155行目で型名を書くだけで自動的に注文が通る」という関係になっている。
+// もし38行目の登録を消すと、ここで実行時エラー（サービスが見つからない）になる。
 app.MapPost("/api/dicom-upload", async (HttpRequest request, DicomUploadService uploadService) =>
 {
     if (!request.HasFormContentType)
