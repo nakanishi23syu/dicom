@@ -7,14 +7,21 @@
 // イベントだけで実装し、この関数1つを3箇所から呼び出して共通化する。
 //
 // 【使う側の書き方（例: StudyTable.vue）】
-//   const { orderedItems, dragHandlers } = useDragSort(toRef(props, 'studies'))
+//   const { draggingIndex, dragHandleProps, dropTargetProps } = useDragSort(toRef(props, 'studies'))
 //
-//   <tr
-//     v-for="(study, index) in orderedItems"
-//     :key="study.studyInstanceUID"
-//     draggable="true"
-//     v-bind="dragHandlers(index)"
-//   >
+//   <tr v-for="(study, index) in orderedItems" :key="study.studyInstanceUID"
+//       v-bind="dropTargetProps(index)">
+//     <td class="drag-col">
+//       <span class="drag-handle" v-bind="dragHandleProps(index)">⠿</span>
+//     </td>
+//   </tr>
+//
+// 【ドラッグの起点をハンドルだけに限定する理由】
+// 以前は draggable 属性を <tr> 自体に付けていたため、行内のどこ（セルの編集用input等）を
+// つまんでもドラッグが始まってしまっていた。Notion等の実製品と同じく「⠿ハンドルをつまんだ
+// ときだけドラッグ操作のマウス判定が有効になる」ようにするため、draggable属性・dragstart・
+// dragendはハンドル要素にだけ渡す（dragHandleProps）。一方dragover/drop（＝どこにドロップ
+// されたか）は行全体で受け取りたいため、そちらは行要素に渡す（dropTargetProps）。
 //
 // 【HTML標準のドラッグ&ドロップの基本】
 // - draggable="true" を付けた要素だけがドラッグ操作の対象になる
@@ -26,12 +33,15 @@
 
 import { ref, type Ref } from 'vue'
 
-export interface DragHandlers {
+export interface DragHandleProps {
   draggable: true
   ondragstart: (event: DragEvent) => void
+  ondragend: (event: DragEvent) => void
+}
+
+export interface DropTargetProps {
   ondragover: (event: DragEvent) => void
   ondrop: (event: DragEvent) => void
-  ondragend: (event: DragEvent) => void
 }
 
 export function useDragSort<T>(items: Ref<T[]>) {
@@ -39,8 +49,16 @@ export function useDragSort<T>(items: Ref<T[]>) {
   // 「今どの行がつままれているか」をハイライト表示する等にも使える。
   const draggingIndex = ref<number | null>(null)
 
-  function onDragStart(index: number) {
+  function onDragStart(index: number, event: DragEvent) {
     draggingIndex.value = index
+    // ドラッグ中に画面に追従する「ドラッグイメージ」を、ハンドル要素（⠿の1文字）ではなく
+    // 行全体（<tr>や<li>）にする。既定のままだとつまんだ要素自体がドラッグイメージになるため、
+    // ハンドルだけをドラッグ起点にした結果イメージも「⠿」だけになってしまい、
+    // 何を並べ替えているのか分かりづらくなるのを防ぐ。
+    const row = (event.currentTarget as HTMLElement | null)?.closest<HTMLElement>('tr, li')
+    if (row && event.dataTransfer) {
+      event.dataTransfer.setDragImage(row, 0, 0)
+    }
   }
 
   function onDragOver(event: DragEvent) {
@@ -68,16 +86,25 @@ export function useDragSort<T>(items: Ref<T[]>) {
     draggingIndex.value = null
   }
 
-  // v-bind="dragHandlers(index)" で <tr> 等に一括で属性・イベントを渡せるようにまとめたヘルパー。
-  function dragHandlers(index: number): DragHandlers {
+  // v-bind="dragHandleProps(index)" をハンドル要素（⠿）に付ける。
+  // ドラッグの開始点をここだけに限定する。
+  function dragHandleProps(index: number): DragHandleProps {
     return {
       draggable: true,
-      ondragstart: () => onDragStart(index),
-      ondragover: onDragOver,
-      ondrop: () => onDrop(index),
+      ondragstart: (event) => onDragStart(index, event),
       ondragend: onDragEnd,
     }
   }
 
-  return { draggingIndex, dragHandlers }
+  // v-bind="dropTargetProps(index)" を行要素（<tr>等）に付ける。
+  // ドロップ判定はハンドルの真上に限定せず、行のどこに落としても並べ替えが完了してほしいため、
+  // dragHandlePropsとは別に行全体へ渡す。
+  function dropTargetProps(index: number): DropTargetProps {
+    return {
+      ondragover: onDragOver,
+      ondrop: () => onDrop(index),
+    }
+  }
+
+  return { draggingIndex, dragHandleProps, dropTargetProps }
 }

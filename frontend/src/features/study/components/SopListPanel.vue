@@ -61,7 +61,7 @@
           :key="instance.sopInstanceUID"
           class="sop-row"
           :class="{ dragging: draggingIndex === index }"
-          v-bind="dragHandlers(index)"
+          v-bind="dropTargetProps(index)"
         >
           <td class="check-col" @click.stop>
             <input
@@ -71,7 +71,9 @@
             />
           </td>
           <td class="drag-col">
-            <span class="drag-handle" title="ドラッグで並べ替え">⠿</span>
+            <span class="drag-handle" title="ドラッグで並べ替え" v-bind="dragHandleProps(index)">
+              ⠿
+            </span>
           </td>
           <td>
             <input
@@ -137,7 +139,7 @@ const editable = useEditableList(instances, {
   getFields: (i: DicomInstance) => ({ instanceNumber: i.instanceNumber }),
 })
 
-const { draggingIndex, dragHandlers } = useDragSort(editable.workingItems)
+const { draggingIndex, dragHandleProps, dropTargetProps } = useDragSort(editable.workingItems)
 
 async function handleSave() {
   try {

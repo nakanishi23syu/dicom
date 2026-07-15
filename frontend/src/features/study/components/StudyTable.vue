@@ -201,7 +201,7 @@
             selected: selectedUID === study.studyInstanceUID,
             dragging: !sort && draggingIndex === index,
           }"
-          v-bind="!sort ? dragHandlers(index) : {}"
+          v-bind="!sort ? dropTargetProps(index) : {}"
           @click="$emit('select-study', study)"
         >
           <!-- Notion風チェックボックス。チェックすると同じ行の主要カラムが編集可能になる。 -->
@@ -212,11 +212,16 @@
               @change="checkable.toggle(study)"
             />
           </td>
-          <!-- ソート中はドラッグでの手動並べ替えができないため、ハンドルを薄く表示するだけにする -->
+          <!--
+            ソート中はドラッグでの手動並べ替えができないため、ハンドルを薄く表示するだけにする。
+            draggable属性・dragstart/dragendはこのハンドル要素にだけ付ける（dragHandleProps）ことで、
+            行内の他の場所（セル編集用inputなど）をつまんでもドラッグが始まらないようにしている。
+          -->
           <td class="drag-col" :class="{ 'drag-disabled': !!sort }" @click.stop>
             <span
               class="drag-handle"
               :title="sort ? 'ソート解除で手動並べ替え可能' : 'ドラッグで並べ替え'"
+              v-bind="!sort ? dragHandleProps(index) : {}"
             >
               ⠿
             </span>
@@ -496,7 +501,7 @@ const editable = useEditableList(filteredItems, {
   }),
 })
 
-const { draggingIndex, dragHandlers } = useDragSort(editable.workingItems)
+const { draggingIndex, dragHandleProps, dropTargetProps } = useDragSort(editable.workingItems)
 
 async function handleSave() {
   try {

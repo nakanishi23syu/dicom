@@ -46,10 +46,10 @@
             :key="study.studyInstanceUid"
             class="drag-row"
             :class="{ selected: selectedStudyIndex === index, dragging: draggingStudyIndex === index }"
-            v-bind="studyDragHandlers(index)"
+            v-bind="studyDropTargetProps(index)"
             @click="selectStudy(index)"
           >
-            <span class="drag-handle">⠿</span>
+            <span class="drag-handle" v-bind="studyDragHandleProps(index)">⠿</span>
             <span class="drag-label">{{ study.patientName }} / {{ study.studyDescription }}</span>
             <span class="drag-order">order: {{ study.order }}</span>
           </li>
@@ -76,10 +76,10 @@
               selected: selectedSeriesIndex === index,
               dragging: draggingSeriesIndex === index,
             }"
-            v-bind="seriesDragHandlers(index)"
+            v-bind="seriesDropTargetProps(index)"
             @click="selectSeries(index)"
           >
-            <span class="drag-handle">⠿</span>
+            <span class="drag-handle" v-bind="seriesDragHandleProps(index)">⠿</span>
             <span class="drag-label">{{ series.seriesDescription || '説明なし' }}</span>
             <span class="drag-order">order: {{ series.order }}</span>
           </li>
@@ -103,9 +103,9 @@
             :key="sop.sopInstanceUid"
             class="drag-row"
             :class="{ dragging: draggingSopIndex === index }"
-            v-bind="sopDragHandlers(index)"
+            v-bind="sopDropTargetProps(index)"
           >
-            <span class="drag-handle">⠿</span>
+            <span class="drag-handle" v-bind="sopDragHandleProps(index)">⠿</span>
             <span class="drag-label">{{ sop.filePath }}</span>
             <span class="drag-order">order: {{ sop.order }}</span>
           </li>
@@ -193,12 +193,21 @@ const sopsOfSelectedSeries = computed<GraphQLSop[]>({
   },
 })
 
-const { draggingIndex: draggingStudyIndex, dragHandlers: studyDragHandlers } =
-  useDragSort(studies)
-const { draggingIndex: draggingSeriesIndex, dragHandlers: seriesDragHandlers } =
-  useDragSort(seriesOfSelectedStudy)
-const { draggingIndex: draggingSopIndex, dragHandlers: sopDragHandlers } =
-  useDragSort(sopsOfSelectedSeries)
+const {
+  draggingIndex: draggingStudyIndex,
+  dragHandleProps: studyDragHandleProps,
+  dropTargetProps: studyDropTargetProps,
+} = useDragSort(studies)
+const {
+  draggingIndex: draggingSeriesIndex,
+  dragHandleProps: seriesDragHandleProps,
+  dropTargetProps: seriesDropTargetProps,
+} = useDragSort(seriesOfSelectedStudy)
+const {
+  draggingIndex: draggingSopIndex,
+  dragHandleProps: sopDragHandleProps,
+  dropTargetProps: sopDropTargetProps,
+} = useDragSort(sopsOfSelectedSeries)
 
 function selectStudy(index: number) {
   selectedStudyIndex.value = index
@@ -347,14 +356,9 @@ onMounted(loadStudies)
   border-radius: 6px;
   padding: 0.5rem 0.75rem;
   font-size: 0.8rem;
-  cursor: grab;
   transition:
     border-color 0.15s,
     opacity 0.15s;
-}
-
-.drag-row:active {
-  cursor: grabbing;
 }
 
 /* ドラッグ中の行は半透明にして「今つまんでいる」ことを視覚的に示す */
@@ -370,6 +374,11 @@ onMounted(loadStudies)
 .drag-handle {
   color: var(--color-text-faint);
   flex-shrink: 0;
+  cursor: grab;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
 }
 
 .drag-label {

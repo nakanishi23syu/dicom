@@ -68,7 +68,7 @@
               selected: series.seriesInstanceUID === selectedSeriesUID,
               dragging: draggingIndex === index,
             }"
-            v-bind="dragHandlers(index)"
+            v-bind="dropTargetProps(index)"
             @click="selectSeries(series)"
             @dblclick="$emit('open-images', series)"
           >
@@ -80,7 +80,9 @@
               />
             </td>
             <td class="drag-col" @click.stop>
-              <span class="drag-handle" title="ドラッグで並べ替え">⠿</span>
+              <span class="drag-handle" title="ドラッグで並べ替え" v-bind="dragHandleProps(index)">
+                ⠿
+              </span>
             </td>
             <td>
               <input
@@ -184,7 +186,7 @@ const editable = useEditableList(studySeries, {
     modality: s.modality,
   }),
 })
-const { draggingIndex, dragHandlers } = useDragSort(editable.workingItems)
+const { draggingIndex, dragHandleProps, dropTargetProps } = useDragSort(editable.workingItems)
 
 async function handleSave() {
   try {
