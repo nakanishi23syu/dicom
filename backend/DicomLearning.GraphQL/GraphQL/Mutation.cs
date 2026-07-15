@@ -1,9 +1,13 @@
+using DicomLearning.GraphQL.Configuration;
+using DicomLearning.GraphQL.Constants;
 using DicomLearning.GraphQL.Data;
 using DicomLearning.GraphQL.Models;
 using DicomLearning.GraphQL.Services;
 using HotChocolate;
 using HotChocolate.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace DicomLearning.GraphQL.GraphQL;
 
@@ -33,13 +37,21 @@ public class Mutation
     // ログイン
     // ======================================================
     // ユーザー名・パスワードを照合し、成功したらJWTを発行する。
-    // 以降のリクエストはこのトークンを `Authorization: Bearer <token>` ヘッダーに付けて送る。
-    // mutation { login(username: "admin", password: "admin1234") { token displayName isAdmin } }
+    // 以前はJWTをレスポンスのtokenフィールドで返し、フロントエンドがlocalStorageに保存して
+    // 以降 `Authorization: Bearer <token>` ヘッダーで送っていたが、localStorageは同一オリジンの
+    // どんなJavaScript（XSSで混入した悪意あるスクリプト含む）からも読めてしまうため、
+    // トークンが盗まれるリスクがあった。
+    // 代わりにJWTをhttpOnly Cookieとしてレスポンスヘッダーに直接乗せる方式に変更した。
+    // httpOnly Cookieはブラウザが自動送信し、JavaScriptからは読み書きできないため、
+    // 万一XSSが起きてもこの経路ではトークンを盗めない。
+    // mutation { login(username: "admin", password: "admin1234") { displayName isAdmin } }
     public async Task<AuthPayload> LoginAsync(
         string username,
         string password,
         [Service] DicomDbContext db,
-        [Service] AuthService authService)
+        [Service] AuthService authService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] IOptions<JwtOptions> jwtOptions)
     {
         var user = await db.AppUsers.FirstOrDefaultAsync(u => u.Username == username);
         if (user is null || !authService.VerifyPassword(user, password))
@@ -50,12 +62,42 @@ public class Mutation
             throw new GraphQLException("ユーザー名またはパスワードが正しくありません。");
         }
 
+        var token = authService.GenerateToken(user);
+        AppendAuthCookie(httpContextAccessor, token, jwtOptions.Value.ExpiryMinutes);
+
         return new AuthPayload
         {
-            Token = authService.GenerateToken(user),
             DisplayName = user.DisplayName,
             IsAdmin = user.IsAdmin,
         };
+    }
+
+    // ======================================================
+    // ログアウト
+    // ======================================================
+    // httpOnly CookieはJSから削除できないため、サーバー側で「即座に無効な期限」を持つ
+    // 同名Cookieを上書きしてブラウザに削除させる。
+    public bool Logout([Service] IHttpContextAccessor httpContextAccessor)
+    {
+        httpContextAccessor.HttpContext!.Response.Cookies.Delete(AppConstants.AuthCookieName);
+        return true;
+    }
+
+    private static void AppendAuthCookie(IHttpContextAccessor httpContextAccessor, string token, int expiryMinutes)
+    {
+        var context = httpContextAccessor.HttpContext!;
+        context.Response.Cookies.Append(AppConstants.AuthCookieName, token, new CookieOptions
+        {
+            HttpOnly = true,
+            // フロントエンド（Viteの別ポート）とバックエンドは異なるオリジンのため、
+            // クロスサイトのCookie送信を許可するにはSameSite=Noneが必要。
+            // SameSite=NoneはSecure（HTTPS）必須というブラウザの仕様があるため、
+            // 開発環境（HTTP）ではSecure=falseのSameSite=Laxにフォールバックする
+            // （localhost同士のポート違いはブラウザ上「same-site」扱いなのでLaxでも送信される）。
+            Secure = context.Request.IsHttps,
+            SameSite = context.Request.IsHttps ? SameSiteMode.None : SameSiteMode.Lax,
+            Expires = DateTimeOffset.UtcNow.AddMinutes(expiryMinutes),
+        });
     }
 
     // ログインしている読影医なら誰でも可能な操作。
@@ -96,119 +138,91 @@ public class Mutation
     }
 
     // ======================================================
-    // 並べ替え保存（Notion風ドラッグ&ドロップ並べ替え）
+    // 変更の保存（並べ替え + インライン編集の統合Mutation）
     // ======================================================
-    // フロントエンドでドラッグ&ドロップして決めた新しい並び順を、
-    // UIDの配列（orderedXxxUids）として渡してもらい、Orderカラムに書き込む。
-    // 検査・シリーズ・SOPの3箇所で同じ形の処理が必要なため、
-    // ApplyReorderAsync に共通ロジックをまとめている（IOrderableインターフェース経由）。
-    // 戻り値は「実際に見つかって更新できた件数」。渡されたUIDがDB上に無い場合はカウントされない。
+    // 以前は「並べ替え保存」（ReorderXxxAsync）と「インライン編集」（UpdateXxxFieldsAsync）が
+    // 別々のMutationだった。フロントエンドでも「ドラッグしたら並べ替えAPIを即座に呼ぶ」
+    // 「セルの入力からフォーカスが外れたら編集APIを即座に呼ぶ」という2系統の保存が並存し、
+    // 保存ボタンも2つに分かれていた。
+    // これを「フロントエンドは編集内容をローカルにだけ貯めておき、1つの保存ボタンを
+    // 押したときにまとめて送る」方式に統一するため、Mutationも1つに統合した。
+    // 送られてくるのは「実際に変更された行だけ」（フロントエンド側で元データとの差分を
+    // 取ってから渡す。composables/useEditableList.ts 参照）。
     //
-    // 並べ替えは全ユーザーに見える表示順を変える操作のため、管理者アカウントのみに限定している
-    // （追加指示書「管理者アカウントなら、できることが増える」に対応）。
+    // 並べ替え（Order変更）は全ユーザーに見える表示順を変える操作のため、
+    // 従来どおり管理者アカウントのみに許可する（追加指示書「管理者アカウントなら、
+    // できることが増える」に対応）。統合後のMutationは1本だが、変更リストの中に
+    // Order指定を含む行が1つでもあれば、その回の呼び出し全体を管理者チェック対象にする。
+    // フィールド編集（DICOMタグと整合性が取れなくてもいい）はログイン済みなら誰でも呼べる。
+    [Authorize]
+    public Task<int> SaveStudyChangesAsync(
+        List<StudyChangeInput> changes,
+        [Service] DicomDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor) =>
+        ApplyChangesAsync(db.UserStudies, changes, db, httpContextAccessor, (study, change) =>
+        {
+            if (change.PatientId is not null) study.PatientId = change.PatientId;
+            if (change.PatientName is not null) study.PatientName = change.PatientName;
+            if (change.StudyDate is not null) study.StudyDate = change.StudyDate.Value;
+            if (change.StudyDescription is not null) study.StudyDescription = change.StudyDescription;
+            if (change.Modality is not null) study.Modality = change.Modality;
+        });
 
-    [Authorize(Roles = ["Admin"])]
-    public Task<int> ReorderStudiesAsync(List<string> orderedStudyInstanceUids, [Service] DicomDbContext db) =>
-        ApplyReorderAsync(db.UserStudies, orderedStudyInstanceUids, db);
+    [Authorize]
+    public Task<int> SaveSeriesChangesAsync(
+        List<SeriesChangeInput> changes,
+        [Service] DicomDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor) =>
+        ApplyChangesAsync(db.UserSeries, changes, db, httpContextAccessor, (series, change) =>
+        {
+            if (change.SeriesNumber is not null) series.SeriesNumber = change.SeriesNumber;
+            if (change.SeriesDescription is not null) series.SeriesDescription = change.SeriesDescription;
+            if (change.Modality is not null) series.Modality = change.Modality;
+        });
 
-    [Authorize(Roles = ["Admin"])]
-    public Task<int> ReorderSeriesAsync(List<string> orderedSeriesInstanceUids, [Service] DicomDbContext db) =>
-        ApplyReorderAsync(db.UserSeries, orderedSeriesInstanceUids, db);
+    [Authorize]
+    public Task<int> SaveSopChangesAsync(
+        List<SopChangeInput> changes,
+        [Service] DicomDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor) =>
+        ApplyChangesAsync(db.UserSops, changes, db, httpContextAccessor, (sop, change) =>
+        {
+            if (change.InstanceNumber is not null) sop.InstanceNumber = change.InstanceNumber;
+        });
 
-    [Authorize(Roles = ["Admin"])]
-    public Task<int> ReorderSopsAsync(List<string> orderedSopInstanceUids, [Service] DicomDbContext db) =>
-        ApplyReorderAsync(db.UserSops, orderedSopInstanceUids, db);
-
-    private static async Task<int> ApplyReorderAsync<TEntity>(
+    private static async Task<int> ApplyChangesAsync<TEntity, TChange>(
         DbSet<TEntity> set,
-        IReadOnlyList<string> orderedKeys,
-        DicomDbContext db)
+        List<TChange> changes,
+        DicomDbContext db,
+        IHttpContextAccessor httpContextAccessor,
+        Action<TEntity, TChange> applyFields)
         where TEntity : class, IOrderable
+        where TChange : IChangeInput
     {
+        if (changes.Count == 0) return 0;
+
+        var hasOrderChange = changes.Any(c => c.Order is not null);
+        if (hasOrderChange && httpContextAccessor.HttpContext?.User.IsInRole("Admin") != true)
+        {
+            throw new GraphQLException("並べ替えの保存は管理者のみ可能です。");
+        }
+
         // 学習用プロジェクト規模のデータ量を前提に、対象テーブルを全件メモリに載せてから
         // UIDでの引き当てを行っている（件数が増えた場合はWHERE句での絞り込みを検討）。
         var entities = await set.ToListAsync();
         var byKey = entities.ToDictionary(e => ((IOrderable)e).ReorderKey);
 
         var matched = 0;
-        for (var i = 0; i < orderedKeys.Count; i++)
+        foreach (var change in changes)
         {
-            if (byKey.TryGetValue(orderedKeys[i], out var entity))
-            {
-                entity.Order = i;
-                matched++;
-            }
+            if (!byKey.TryGetValue(change.Key, out var entity)) continue;
+            if (change.Order is not null) entity.Order = change.Order.Value;
+            applyFields(entity, change);
+            matched++;
         }
 
         await db.SaveChangesAsync();
         return matched;
-    }
-
-    // ======================================================
-    // インライン編集（Notion風チェック→編集。指示書2.md要望4）
-    // ======================================================
-    // 一覧の左端チェックボックスをONにした行だけ、表示中の主要カラムをその場で編集できるようにする。
-    // 「dicomのタグと整合性が取れなくてもいい」という要望どおり、DICOM由来の値かどうかを問わず
-    // そのまま上書きする（バリデーションはしない）。引数がnullの項目は変更しない。
-    // ログイン済みならどのユーザーでも呼べる（並べ替え・削除ほど影響が大きい操作ではないため
-    // Adminロールまでは要求しない）。
-    [Authorize]
-    public async Task<UserStudy> UpdateStudyFieldsAsync(
-        string studyInstanceUid,
-        string? patientId,
-        string? patientName,
-        DateOnly? studyDate,
-        string? studyDescription,
-        string? modality,
-        string? accessionNumber,
-        string? bodyPartExamined,
-        [Service] DicomDbContext db)
-    {
-        var study = await db.UserStudies.FirstOrDefaultAsync(s => s.StudyInstanceUid == studyInstanceUid)
-            ?? throw new GraphQLException($"指定された検査が見つかりません: {studyInstanceUid}");
-
-        if (patientId is not null) study.PatientId = patientId;
-        if (patientName is not null) study.PatientName = patientName;
-        if (studyDate is not null) study.StudyDate = studyDate.Value;
-        if (studyDescription is not null) study.StudyDescription = studyDescription;
-        if (modality is not null) study.Modality = modality;
-        if (accessionNumber is not null) study.AccessionNumber = accessionNumber;
-        if (bodyPartExamined is not null) study.BodyPartExamined = bodyPartExamined;
-
-        await db.SaveChangesAsync();
-        return study;
-    }
-
-    [Authorize]
-    public async Task<UserSeries> UpdateSeriesFieldsAsync(
-        string seriesInstanceUid,
-        string? seriesNumber,
-        string? seriesDescription,
-        string? modality,
-        [Service] DicomDbContext db)
-    {
-        var series = await db.UserSeries.FirstOrDefaultAsync(se => se.SeriesInstanceUid == seriesInstanceUid)
-            ?? throw new GraphQLException($"指定されたシリーズが見つかりません: {seriesInstanceUid}");
-
-        if (seriesNumber is not null) series.SeriesNumber = seriesNumber;
-        if (seriesDescription is not null) series.SeriesDescription = seriesDescription;
-        if (modality is not null) series.Modality = modality;
-
-        await db.SaveChangesAsync();
-        return series;
-    }
-
-    [Authorize]
-    public async Task<UserSop> UpdateSopFieldsAsync(
-        string sopInstanceUid,
-        string? instanceNumber,
-        [Service] DicomDbContext db)
-    {
-        var sop = await FindSopOrThrowAsync(sopInstanceUid, db);
-        if (instanceNumber is not null) sop.InstanceNumber = instanceNumber;
-
-        await db.SaveChangesAsync();
-        return sop;
     }
 
     // ======================================================

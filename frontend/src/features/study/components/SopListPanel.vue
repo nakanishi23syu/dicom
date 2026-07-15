@@ -17,18 +17,23 @@
       <span class="reorder-actions">
         <button
           class="reorder-btn"
-          :disabled="!authStore.isAdmin || reorder.saving.value"
-          :title="authStore.isAdmin ? '現在の並び順をDBに保存します' : '管理者のみ保存できます'"
-          @click="handleSaveOrder"
+          :disabled="!editable.dirty.value || editable.saving.value"
+          title="変更した内容をDBに保存します"
+          @click="handleSave"
         >
           💾 保存
         </button>
-        <button class="reorder-btn" :disabled="reorder.saving.value" @click="reorder.apply()">
-          ↺ 適用
+        <button
+          class="reorder-btn"
+          :disabled="!editable.dirty.value || editable.saving.value"
+          @click="editable.apply()"
+        >
+          ↺ 元に戻す
         </button>
-        <span v-if="reorder.dirty.value" class="dirty-hint">未保存</span>
-        <span v-if="reorder.saveError.value" class="reorder-error">
-          {{ reorder.saveError.value }}
+        <span v-if="editable.dirty.value" class="dirty-hint">未保存</span>
+        <span v-if="!authStore.isAdmin" class="dirty-hint">※並べ替えは管理者のみ</span>
+        <span v-if="editable.saveError.value" class="reorder-error">
+          {{ editable.saveError.value }}
         </span>
       </span>
       <span v-if="checkable.checkedIds.value.size > 0" class="checked-actions">
@@ -52,7 +57,7 @@
       </thead>
       <tbody>
         <tr
-          v-for="(instance, index) in reorder.workingItems.value"
+          v-for="(instance, index) in editable.workingItems.value"
           :key="instance.sopInstanceUID"
           class="sop-row"
           :class="{ dragging: draggingIndex === index }"
@@ -71,10 +76,9 @@
           <td>
             <input
               v-if="checkable.isChecked(instance)"
+              v-model="instance.instanceNumber"
               class="cell-input"
-              :value="instance.instanceNumber"
               @click.stop
-              @blur="saveField(instance, $event)"
             />
             <template v-else>{{ instance.instanceNumber || '—' }}</template>
           </td>
@@ -100,15 +104,16 @@
 import { computed, ref } from 'vue'
 import type { DicomSeries, DicomInstance } from '@/types/dicom'
 import { useAuthStore } from '@/stores/authStore'
+import { useToast } from '@/composables/useToast'
 import { useDragSort } from '@/composables/useDragSort'
-import { useReorderable } from '@/composables/useReorderable'
+import { useEditableList } from '@/composables/useEditableList'
 import { useCheckableRows } from '@/composables/useCheckableRows'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import {
-  reorderSops,
-  updateSopFields,
+  saveSopChanges,
   revertSopFields,
   deleteSop,
+  type SopChangeInput,
 } from '@/services/backendApiService'
 
 const props = defineProps<{
@@ -120,24 +125,33 @@ const emit = defineEmits<{
 }>()
 
 const authStore = useAuthStore()
+const toast = useToast()
 
 // 呼び出し側で :key="series.seriesInstanceUID" を付けてもらう想定
 // （シリーズが切り替わるとこのコンポーネント自体が再マウントされ、
-// 前のシリーズの未保存ドラッグ状態を引きずらない）。
+// 前のシリーズの未保存の編集状態を引きずらない）。
 const instances = computed(() => props.series.instances)
-const reorder = useReorderable(
-  instances,
-  (i: DicomInstance) => i.sopInstanceUID,
-  (i: DicomInstance) => i.order
-)
+const editable = useEditableList(instances, {
+  getId: (i: DicomInstance) => i.sopInstanceUID,
+  getOrder: (i: DicomInstance) => i.order,
+  getFields: (i: DicomInstance) => ({ instanceNumber: i.instanceNumber }),
+})
 
-const { draggingIndex, dragHandlers } = useDragSort(reorder.workingItems)
+const { draggingIndex, dragHandlers } = useDragSort(editable.workingItems)
 
-async function handleSaveOrder() {
+async function handleSave() {
   try {
-    await reorder.save(reorderSops)
-  } catch {
-    // reorder.saveError が画面に表示されるため、ここでは追加のハンドリング不要。
+    const count = await editable.save(
+      (instance, patch): SopChangeInput => ({
+        sopInstanceUid: instance.sopInstanceUID,
+        order: patch.order,
+        instanceNumber: patch.fields?.instanceNumber,
+      }),
+      saveSopChanges
+    )
+    if (count > 0) toast.success(`${count}件の変更を保存しました`)
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : '保存に失敗しました')
   }
 }
 
@@ -147,16 +161,6 @@ async function handleSaveOrder() {
 const checkable = useCheckableRows<DicomInstance>((i) => i.sopInstanceUID)
 const showDeleteConfirm = ref(false)
 const reverting = ref(false)
-
-async function saveField(instance: DicomInstance, event: Event) {
-  const value = (event.target as HTMLInputElement).value
-  try {
-    await updateSopFields(instance.sopInstanceUID, value)
-    instance.instanceNumber = value
-  } catch (e) {
-    alert(e instanceof Error ? e.message : '保存に失敗しました')
-  }
-}
 
 // チェックしたSOPを、実際のDICOMファイルのタグ値に戻す（インライン編集で上書きした値を破棄する）。
 async function handleRevertChecked() {
@@ -170,7 +174,7 @@ async function handleRevertChecked() {
       instance.instanceNumber = reverted.instanceNumber
     }
   } catch (e) {
-    alert(e instanceof Error ? e.message : 'DICOMタグへの復元に失敗しました')
+    toast.error(e instanceof Error ? e.message : 'DICOMタグへの復元に失敗しました')
   } finally {
     reverting.value = false
   }
@@ -181,7 +185,7 @@ async function handleDeleteChecked() {
   try {
     await Promise.all(ids.map((id) => deleteSop(id)))
   } catch (e) {
-    alert(e instanceof Error ? e.message : '削除に失敗しました')
+    toast.error(e instanceof Error ? e.message : '削除に失敗しました')
   } finally {
     checkable.clear()
     emit('data-changed')

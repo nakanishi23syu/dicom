@@ -32,7 +32,7 @@
       <!-- ── 検査一覧（1階層目） ── -->
       <section class="list-section">
         <div class="list-header">
-          <h3>検査一覧（reorderStudies）</h3>
+          <h3>検査一覧（saveStudyChanges）</h3>
           <div class="control-row">
             <BaseButton variant="secondary" @click="applyOrder(studies)">
               並べ替え適用
@@ -59,7 +59,7 @@
       <!-- ── シリーズ一覧（2階層目、選択中の検査のもの） ── -->
       <section v-if="selectedStudy" class="list-section">
         <div class="list-header">
-          <h3>シリーズ一覧（reorderSeries） — {{ selectedStudy.patientName }}</h3>
+          <h3>シリーズ一覧（saveSeriesChanges） — {{ selectedStudy.patientName }}</h3>
           <div class="control-row">
             <BaseButton variant="secondary" @click="applyOrder(seriesOfSelectedStudy)">
               並べ替え適用
@@ -89,7 +89,7 @@
       <!-- ── SOP（画像）一覧（3階層目、選択中のシリーズのもの） ── -->
       <section v-if="selectedSeries" class="list-section">
         <div class="list-header">
-          <h3>SOP（画像）一覧（reorderSops）</h3>
+          <h3>SOP（画像）一覧（saveSopChanges）</h3>
           <div class="control-row">
             <BaseButton variant="secondary" @click="applyOrder(sopsOfSelectedSeries)">
               並べ替え適用
@@ -148,9 +148,9 @@ import { useDragSort } from '@/composables/useDragSort'
 import { describeAuthError } from '@/services/authErrorMessage'
 import {
   fetchStudies,
-  reorderStudies,
-  reorderSeries,
-  reorderSops,
+  saveStudyChanges,
+  saveSeriesChanges,
+  saveSopChanges,
   type GraphQLStudy,
   type GraphQLSeries,
   type GraphQLSop,
@@ -227,12 +227,16 @@ function applyOrder<T extends { order: number }>(items: T[]) {
   items.sort((a, b) => a.order - b.order)
 }
 
-// 並べ替え保存は backend 側で [Authorize(Roles = "Admin")] が付いているため、
+// 並べ替え（order指定）は backend 側で管理者アカウントのみに限定されているため、
 // 管理者アカウントでログインしていないと失敗する（追加指示書の「管理者ならできることが増える」に対応）。
 // 未ログイン/非管理者の場合はGraphQLエラーがそのままthrowされるので、ここでcatchして分かりやすく表示する。
+// saveXxxChangesは「並べ替え＋インライン編集」を1本化した統合Mutationのため、
+// ここでは全件のorderを渡して並べ替えだけを行う形で呼び出す。
 async function saveStudyOrder() {
   try {
-    const matched = await reorderStudies(studies.value.map((s) => s.studyInstanceUid))
+    const matched = await saveStudyChanges(
+      studies.value.map((s, i) => ({ studyInstanceUid: s.studyInstanceUid, order: i }))
+    )
     // 保存直後にサーバー側の新しいorder値をローカルにも反映しておく（0始まりの連番）。
     studies.value.forEach((s, i) => (s.order = i))
     showSaveResultMessage(`検査の並び順を保存しました（${matched}件更新）`)
@@ -243,8 +247,8 @@ async function saveStudyOrder() {
 
 async function saveSeriesOrder() {
   try {
-    const matched = await reorderSeries(
-      seriesOfSelectedStudy.value.map((s) => s.seriesInstanceUid)
+    const matched = await saveSeriesChanges(
+      seriesOfSelectedStudy.value.map((s, i) => ({ seriesInstanceUid: s.seriesInstanceUid, order: i }))
     )
     seriesOfSelectedStudy.value.forEach((s, i) => (s.order = i))
     showSaveResultMessage(`シリーズの並び順を保存しました（${matched}件更新）`)
@@ -255,7 +259,9 @@ async function saveSeriesOrder() {
 
 async function saveSopOrder() {
   try {
-    const matched = await reorderSops(sopsOfSelectedSeries.value.map((s) => s.sopInstanceUid))
+    const matched = await saveSopChanges(
+      sopsOfSelectedSeries.value.map((s, i) => ({ sopInstanceUid: s.sopInstanceUid, order: i }))
+    )
     sopsOfSelectedSeries.value.forEach((s, i) => (s.order = i))
     showSaveResultMessage(`SOPの並び順を保存しました（${matched}件更新）`)
   } catch (e) {

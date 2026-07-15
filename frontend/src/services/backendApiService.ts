@@ -151,47 +151,6 @@ export async function fetchStudies(): Promise<GraphQLStudy[]> {
 }
 
 // ======================================================
-// 並べ替え保存（Notion風ドラッグ&ドロップ並べ替え）
-// ======================================================
-// ドラッグ&ドロップで決めた新しい順番のUIDを配列で渡すと、backend側のOrderカラムに反映される。
-// 戻り値は実際に更新できた件数（渡したUIDがDBに存在しない場合はカウントされない）。
-export async function reorderStudies(orderedStudyInstanceUids: string[]): Promise<number> {
-  const query = `
-    mutation ReorderStudies($ids: [String!]!) {
-      reorderStudies(orderedStudyInstanceUids: $ids)
-    }
-  `
-  const data = await graphqlRequest<{ reorderStudies: number }>(query, {
-    ids: orderedStudyInstanceUids,
-  })
-  return data.reorderStudies
-}
-
-export async function reorderSeries(orderedSeriesInstanceUids: string[]): Promise<number> {
-  const query = `
-    mutation ReorderSeries($ids: [String!]!) {
-      reorderSeries(orderedSeriesInstanceUids: $ids)
-    }
-  `
-  const data = await graphqlRequest<{ reorderSeries: number }>(query, {
-    ids: orderedSeriesInstanceUids,
-  })
-  return data.reorderSeries
-}
-
-export async function reorderSops(orderedSopInstanceUids: string[]): Promise<number> {
-  const query = `
-    mutation ReorderSops($ids: [String!]!) {
-      reorderSops(orderedSopInstanceUids: $ids)
-    }
-  `
-  const data = await graphqlRequest<{ reorderSops: number }>(query, {
-    ids: orderedSopInstanceUids,
-  })
-  return data.reorderSops
-}
-
-// ======================================================
 // fetchPatientTimeline — 患者ごとの検査履歴を新しい順に取得する
 // ======================================================
 // 関連用語集.md にある「タイムラインビュー」（同一患者の過去検査を時系列で並べる、
@@ -233,104 +192,67 @@ export async function fetchPatientTimeline(patientId: string): Promise<GraphQLSt
 }
 
 // ======================================================
-// インライン編集（Notion風チェック→編集）
+// 変更の保存（並べ替え + インライン編集の統合Mutation）
 // ======================================================
-// 引数がundefinedの項目はbackend側で「変更しない」扱いになる（Mutation.cs参照）。
-export interface StudyFieldsInput {
+// 以前は「並べ替え保存」（reorderXxx）と「インライン編集」（updateXxxFields）が
+// 別々のMutationで、フロントエンドも「ドラッグ即保存」「ブラー即保存」の2系統だった。
+// composables/useEditableList.ts が元データとの差分（変更された行だけ）を検出し、
+// ここでは1つの保存ボタンからその差分をまとめて送るだけにする。
+// 各フィールドはundefinedなら「変更しない」扱い（backend Mutation.cs参照）。
+// orderが含まれる変更は管理者のみ許可される（backend側で判定・エラーを返す）。
+export interface StudyChangeInput {
+  studyInstanceUid: string
+  order?: number
   patientId?: string
   patientName?: string
   // "YYYY-MM-DD"形式（HotChocolateがDateOnlyに割り当てるLocalDateスカラー）。
-  // dicomService.mapBackendStudyの逆変換にあたる。
   studyDate?: string
   studyDescription?: string
   modality?: string
-  accessionNumber?: string
-  bodyPartExamined?: string
 }
 
-export async function updateStudyFields(
-  studyInstanceUid: string,
-  fields: StudyFieldsInput
-): Promise<void> {
+export async function saveStudyChanges(changes: StudyChangeInput[]): Promise<number> {
   const query = `
-    mutation UpdateStudyFields(
-      $studyInstanceUid: String!
-      $patientId: String
-      $patientName: String
-      $studyDate: LocalDate
-      $studyDescription: String
-      $modality: String
-      $accessionNumber: String
-      $bodyPartExamined: String
-    ) {
-      updateStudyFields(
-        studyInstanceUid: $studyInstanceUid
-        patientId: $patientId
-        patientName: $patientName
-        studyDate: $studyDate
-        studyDescription: $studyDescription
-        modality: $modality
-        accessionNumber: $accessionNumber
-        bodyPartExamined: $bodyPartExamined
-      ) {
-        studyInstanceUid
-      }
+    mutation SaveStudyChanges($changes: [StudyChangeInput!]!) {
+      saveStudyChanges(changes: $changes)
     }
   `
-  await graphqlRequest<{ updateStudyFields: { studyInstanceUid: string } }>(query, {
-    studyInstanceUid,
-    ...fields,
-  })
+  const data = await graphqlRequest<{ saveStudyChanges: number }>(query, { changes })
+  return data.saveStudyChanges
 }
 
-export interface SeriesFieldsInput {
+export interface SeriesChangeInput {
+  seriesInstanceUid: string
+  order?: number
   seriesNumber?: string
   seriesDescription?: string
   modality?: string
 }
 
-export async function updateSeriesFields(
-  seriesInstanceUid: string,
-  fields: SeriesFieldsInput
-): Promise<void> {
+export async function saveSeriesChanges(changes: SeriesChangeInput[]): Promise<number> {
   const query = `
-    mutation UpdateSeriesFields(
-      $seriesInstanceUid: String!
-      $seriesNumber: String
-      $seriesDescription: String
-      $modality: String
-    ) {
-      updateSeriesFields(
-        seriesInstanceUid: $seriesInstanceUid
-        seriesNumber: $seriesNumber
-        seriesDescription: $seriesDescription
-        modality: $modality
-      ) {
-        seriesInstanceUid
-      }
+    mutation SaveSeriesChanges($changes: [SeriesChangeInput!]!) {
+      saveSeriesChanges(changes: $changes)
     }
   `
-  await graphqlRequest<{ updateSeriesFields: { seriesInstanceUid: string } }>(query, {
-    seriesInstanceUid,
-    ...fields,
-  })
+  const data = await graphqlRequest<{ saveSeriesChanges: number }>(query, { changes })
+  return data.saveSeriesChanges
 }
 
-export async function updateSopFields(
-  sopInstanceUid: string,
-  instanceNumber: string
-): Promise<void> {
+export interface SopChangeInput {
+  sopInstanceUid: string
+  order?: number
+  instanceNumber?: string
+}
+
+export async function saveSopChanges(changes: SopChangeInput[]): Promise<number> {
   const query = `
-    mutation UpdateSopFields($sopInstanceUid: String!, $instanceNumber: String) {
-      updateSopFields(sopInstanceUid: $sopInstanceUid, instanceNumber: $instanceNumber) {
-        sopInstanceUid
-      }
+    mutation SaveSopChanges($changes: [SopChangeInput!]!) {
+      saveSopChanges(changes: $changes)
     }
   `
-  await graphqlRequest<{ updateSopFields: { sopInstanceUid: string } }>(query, {
-    sopInstanceUid,
-    instanceNumber,
-  })
+  const data = await graphqlRequest<{ saveSopChanges: number }>(query, { changes })
+  return data.saveSopChanges
 }
 
 // ======================================================

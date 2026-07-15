@@ -2,29 +2,29 @@
 // stores/authStore.ts — ログイン状態のグローバル管理（Pinia Store）
 // ======================================================
 // dicomStore.ts と同じCompositoin APIスタイルのPiniaストア。
-// トークンはページをリロードしても消えてほしいので、初期値をlocalStorageから読み込み、
-// login/logout のたびにlocalStorageへも書き戻す（＝PiniaのstateとlocalStorageを常に同期させる）。
-
-import { ref, computed } from 'vue'
+//
+// 【セキュリティ対応】以前はJWT自体をlocalStorageに保存し、ページリロード後も
+// そこから読み込んで復元していたが、localStorageはXSS（悪意あるスクリプトの混入）が
+// 起きた場合に同一オリジンのどんなJavaScriptからも読めてしまうため、トークンを
+// 盗まれるリスクがあった。
+// 対応として、JWTはbackendがhttpOnly Cookieとして発行する方式に変更した
+// （services/graphqlClient.ts が credentials: 'include' で自動送信する）。
+// httpOnly CookieはJavaScriptから値を読めないため、フロントエンドはトークンの値を
+// 一切保持しない。その代わり、ページリロード後のログイン状態復元は
+// restoreSession() が backend の me クエリに問い合わせる方式にした
+// （Cookieが有効ならdisplayName/isAdminを返してくれる）。
+import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import { login as loginRequest } from '@/services/authService'
-import {
-  AUTH_TOKEN_STORAGE_KEY,
-  AUTH_DISPLAY_NAME_STORAGE_KEY,
-  AUTH_IS_ADMIN_STORAGE_KEY,
-} from '@/constants/auth'
+import { login as loginRequest, logout as logoutRequest, me as meRequest } from '@/services/authService'
 
 export const useAuthStore = defineStore('auth', () => {
   // ── State ──────────────────────────────────────────────
-  // 初期値をlocalStorageから復元する（ページリロード後もログイン状態を保つため）。
-  const token = ref<string | null>(localStorage.getItem(AUTH_TOKEN_STORAGE_KEY))
-  const displayName = ref<string>(localStorage.getItem(AUTH_DISPLAY_NAME_STORAGE_KEY) ?? '')
-  const isAdmin = ref<boolean>(localStorage.getItem(AUTH_IS_ADMIN_STORAGE_KEY) === 'true')
+  // トークンは保持しない（Cookieの中身はJSから見えないし、見る必要もない）。
+  const displayName = ref<string>('')
+  const isAdmin = ref<boolean>(false)
+  const isLoggedIn = ref(false)
   const loading = ref(false)
   const error = ref<string | null>(null)
-
-  // ── Getters ────────────────────────────────────────────
-  const isLoggedIn = computed(() => token.value !== null)
 
   // ── Actions ────────────────────────────────────────────
   async function login(username: string, password: string) {
@@ -32,14 +32,9 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
     try {
       const payload = await loginRequest(username, password)
-      token.value = payload.token
       displayName.value = payload.displayName
       isAdmin.value = payload.isAdmin
-
-      // graphqlClient.ts はこのキーを直接読むので、Piniaのstateと合わせてlocalStorageも更新する。
-      localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, payload.token)
-      localStorage.setItem(AUTH_DISPLAY_NAME_STORAGE_KEY, payload.displayName)
-      localStorage.setItem(AUTH_IS_ADMIN_STORAGE_KEY, String(payload.isAdmin))
+      isLoggedIn.value = true
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'ログインに失敗しました'
       throw e
@@ -48,14 +43,26 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  function logout() {
-    token.value = null
-    displayName.value = ''
-    isAdmin.value = false
-    localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY)
-    localStorage.removeItem(AUTH_DISPLAY_NAME_STORAGE_KEY)
-    localStorage.removeItem(AUTH_IS_ADMIN_STORAGE_KEY)
+  async function logout() {
+    try {
+      await logoutRequest()
+    } finally {
+      displayName.value = ''
+      isAdmin.value = false
+      isLoggedIn.value = false
+    }
   }
 
-  return { token, displayName, isAdmin, loading, error, isLoggedIn, login, logout }
+  // アプリ起動時（main.ts）に1回呼び出し、Cookieがまだ有効ならログイン状態を復元する。
+  // 未ログイン（Cookieが無い/期限切れ）でもエラーにはせず、単に非ログイン状態のままにする。
+  async function restoreSession() {
+    const result = await meRequest()
+    if (result) {
+      displayName.value = result.displayName
+      isAdmin.value = result.isAdmin
+      isLoggedIn.value = true
+    }
+  }
+
+  return { displayName, isAdmin, isLoggedIn, loading, error, login, logout, restoreSession }
 })

@@ -31,25 +31,34 @@
         <span v-else class="sort-hint">列見出しをクリックするとソートできます</span>
 
         <!--
-          ── 並べ替え保存・適用（Notion風ドラッグ&ドロップの永続化）──
-          保存: 現在のドラッグ結果をDBのOrderカラムへ書き込む（管理者のみ）。
-          適用: DBに保存済みのOrder順に表示を戻す（未保存のドラッグ結果を破棄する）。
+          ── 変更の保存（並べ替え + インライン編集の統合。追加要望対応）──
+          並べ替え・インライン編集どちらも、まずはローカルの作業用配列（editable.workingItems）
+          だけを書き換え、この保存ボタンを押したときに「最初に取得したデータとの差分」だけを
+          まとめてDBへ反映する。差分が無ければ何もしない。
+          元に戻す: DBに保存済みの状態に表示を戻す（未保存の変更を破棄する）。
         -->
         <span class="reorder-actions">
           <button
             class="reorder-btn"
-            :disabled="!authStore.isAdmin || reorder.saving.value"
-            :title="authStore.isAdmin ? '現在の並び順をDBに保存します' : '管理者のみ保存できます'"
-            @click="handleSaveOrder"
+            :disabled="!editable.dirty.value || editable.saving.value"
+            title="変更した内容をDBに保存します"
+            @click="handleSave"
           >
-            💾 並べ替えを保存
+            💾 保存
           </button>
-          <button class="reorder-btn" :disabled="reorder.saving.value" @click="reorder.apply()">
-            ↺ 並べ替えを適用
+          <button
+            class="reorder-btn"
+            :disabled="!editable.dirty.value || editable.saving.value"
+            @click="editable.apply()"
+          >
+            ↺ 元に戻す
           </button>
-          <span v-if="reorder.dirty.value" class="dirty-hint">未保存の変更があります</span>
-          <span v-if="reorder.saveError.value" class="reorder-error">
-            {{ reorder.saveError.value }}
+          <span v-if="editable.dirty.value" class="dirty-hint">未保存の変更があります</span>
+          <span v-if="!authStore.isAdmin" class="sort-hint">
+            ※並べ替えの保存は管理者のみ反映されます
+          </span>
+          <span v-if="editable.saveError.value" class="reorder-error">
+            {{ editable.saveError.value }}
           </span>
         </span>
 
@@ -215,25 +224,19 @@
           <!--
             【|| '—'】 フォールバック
             値が空文字・null・undefined の場合にダッシュ（—）を表示する。
-            チェック中の行だけ<input>に切り替え、blur時にbackendへ保存する
-            （指示書2.md要望4「チェックすると、値編集ができるようにしてほしい」）。
+            チェック中の行だけ<input>に切り替える（指示書2.md要望4「チェックすると、
+            値編集ができるようにしてほしい」）。v-modelでworkingItems内のオブジェクトを
+            直接書き換えるだけで、backendへの送信は行わない（保存ボタンを押すまで待つ。
+            追加要望「変更箇所だけ保存ボタンでまとめて反映」対応）。
             @click.stopは<input>自体に付ける（<td>に付けると、非チェック時の
             通常セルクリックまで行選択(select-study)へのバブリングが止まってしまうため）。
           -->
           <td>
             <input
               v-if="checkable.isChecked(study)"
+              v-model="study.patientID"
               class="cell-input"
-              :value="study.patientID"
               @click.stop
-              @blur="
-                saveField(
-                  study,
-                  $event,
-                  (v) => ({ patientId: v }),
-                  (v) => (study.patientID = v)
-                )
-              "
             />
             <template v-else>{{ study.patientID || '—' }}</template>
           </td>
@@ -248,23 +251,18 @@
           <td>
             <input
               v-if="checkable.isChecked(study)"
+              v-model="study.patientName"
               class="cell-input"
-              :value="study.patientName"
               @click.stop
-              @blur="
-                saveField(
-                  study,
-                  $event,
-                  (v) => ({ patientName: v }),
-                  (v) => (study.patientName = v)
-                )
-              "
             />
             <template v-else>{{ study.patientName || '—' }}</template>
           </td>
           <!--
             formatDate() を呼んで YYYYMMDD → YYYY/MM/DD に整形する。
             テンプレート内でも関数呼び出しができる。
+            <input type="date">の値は常に"YYYY-MM-DD"形式だが、study.studyDateは
+            DICOM由来の"YYYYMMDD"形式で保持しているため、v-modelではなく
+            相互変換（toInputDate/fromInputDate）を挟んだ手動バインディングにする。
           -->
           <td>
             <input
@@ -273,31 +271,16 @@
               type="date"
               :value="toInputDate(study.studyDate)"
               @click.stop
-              @blur="
-                saveField(
-                  study,
-                  $event,
-                  (v) => ({ studyDate: v }),
-                  (v) => (study.studyDate = fromInputDate(v))
-                )
-              "
+              @input="study.studyDate = fromInputDate(($event.target as HTMLInputElement).value)"
             />
             <template v-else>{{ formatDate(study.studyDate) }}</template>
           </td>
           <td>
             <input
               v-if="checkable.isChecked(study)"
+              v-model="study.modality"
               class="cell-input"
-              :value="study.modality"
               @click.stop
-              @blur="
-                saveField(
-                  study,
-                  $event,
-                  (v) => ({ modality: v }),
-                  (v) => (study.modality = v)
-                )
-              "
             />
             <span v-else class="badge">{{ study.modality || '—' }}</span>
           </td>
@@ -305,17 +288,9 @@
           <td>
             <input
               v-if="checkable.isChecked(study)"
+              v-model="study.studyDescription"
               class="cell-input"
-              :value="study.studyDescription"
               @click.stop
-              @blur="
-                saveField(
-                  study,
-                  $event,
-                  (v) => ({ studyDescription: v }),
-                  (v) => (study.studyDescription = v)
-                )
-              "
             />
             <template v-else>{{ study.studyDescription || '—' }}</template>
           </td>
@@ -360,15 +335,15 @@ import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import ReadingStatusBadge from './ReadingStatusBadge.vue'
 import { useReadingStatus } from '@/composables/useReadingStatus'
 import { useDragSort } from '@/composables/useDragSort'
-import { useReorderable } from '@/composables/useReorderable'
+import { useEditableList } from '@/composables/useEditableList'
 import { useCheckableRows } from '@/composables/useCheckableRows'
 import { useAuthStore } from '@/stores/authStore'
+import { useToast } from '@/composables/useToast'
 import {
-  reorderStudies,
-  updateStudyFields,
+  saveStudyChanges,
   revertStudyFields,
   deleteStudy,
-  type StudyFieldsInput,
+  type StudyChangeInput,
 } from '@/services/backendApiService'
 import {
   useFilterSort,
@@ -502,31 +477,51 @@ const showFilterPanel = ref(false)
 const sortArrow = computed(() => (sort.value?.direction === 'asc' ? '▲' : '▼'))
 
 // ======================================================
-// Notion風ドラッグ&ドロップでの並べ替え（DBのOrderカラムに保存・適用する）
+// 変更の保存（並べ替え + インライン編集の統合。追加要望対応）
 // ======================================================
 // ソートが有効な間は表示順がソート結果で決まるため、ドラッグ並べ替えの対象にはしない
 // （Notion本体も同じ挙動）。ソートが無効なときだけ、フィルター後の一覧を
-// 「DBのOrder順（または未保存のドラッグ結果）」で並べ、ドラッグで並べ替えられるようにする。
+// 「DBのOrder順（または未保存の編集結果）」で並べ、ドラッグ・セル編集できるようにする。
 const authStore = useAuthStore()
-const reorder = useReorderable(
-  filteredItems,
-  (s: DicomStudy) => s.studyInstanceUID,
-  (s: DicomStudy) => s.order
-)
+const toast = useToast()
+const editable = useEditableList(filteredItems, {
+  getId: (s: DicomStudy) => s.studyInstanceUID,
+  getOrder: (s: DicomStudy) => s.order,
+  getFields: (s: DicomStudy) => ({
+    patientId: s.patientID,
+    patientName: s.patientName,
+    studyDate: s.studyDate,
+    studyDescription: s.studyDescription,
+    modality: s.modality,
+  }),
+})
 
-const { draggingIndex, dragHandlers } = useDragSort(reorder.workingItems)
+const { draggingIndex, dragHandlers } = useDragSort(editable.workingItems)
 
-async function handleSaveOrder() {
+async function handleSave() {
   try {
-    await reorder.save(reorderStudies)
-  } catch {
-    // reorder.saveError が画面に表示されるため、ここでは追加のハンドリング不要。
+    const count = await editable.save(
+      (study, patch): StudyChangeInput => ({
+        studyInstanceUid: study.studyInstanceUID,
+        order: patch.order,
+        patientId: patch.fields?.patientId,
+        patientName: patch.fields?.patientName,
+        studyDate: patch.fields?.studyDate ? toInputDate(patch.fields.studyDate) : undefined,
+        studyDescription: patch.fields?.studyDescription,
+        modality: patch.fields?.modality,
+      }),
+      saveStudyChanges
+    )
+    if (count > 0) toast.success(`${count}件の変更を保存しました`)
+  } catch (e) {
+    // editable.saveError にも同じ内容が入るが、トーストでも即時に気づけるようにする。
+    toast.error(e instanceof Error ? e.message : '保存に失敗しました')
   }
 }
 
-// 実際にテーブルへ描画する一覧: ソート中はソート結果、そうでなければドラッグ並べ替え結果。
+// 実際にテーブルへ描画する一覧: ソート中はソート結果、そうでなければ編集中の作業用配列。
 const displayedStudies = computed(() =>
-  sort.value ? filteredSortedItems.value : reorder.workingItems.value
+  sort.value ? filteredSortedItems.value : editable.workingItems.value
 )
 
 // ======================================================
@@ -535,24 +530,6 @@ const displayedStudies = computed(() =>
 const checkable = useCheckableRows<DicomStudy>((s) => s.studyInstanceUID)
 const showDeleteConfirm = ref(false)
 const reverting = ref(false)
-
-// セル1つ分の編集を確定する（inputのblur時に呼ばれる）。
-// toMutationInput: 入力値からbackendへ渡すStudyFieldsInputを組み立てる
-// applyLocal: 保存に成功した場合、表示中のstudyオブジェクトへ直接反映する（一覧の再取得なしで見た目に反映するため）
-async function saveField(
-  study: DicomStudy,
-  event: Event,
-  toMutationInput: (value: string) => StudyFieldsInput,
-  applyLocal: (value: string) => void
-) {
-  const value = (event.target as HTMLInputElement).value
-  try {
-    await updateStudyFields(study.studyInstanceUID, toMutationInput(value))
-    applyLocal(value)
-  } catch (e) {
-    alert(e instanceof Error ? e.message : '保存に失敗しました')
-  }
-}
 
 // チェックした行を、実際のDICOMファイルのタグ値に戻す（インライン編集で上書きした値を破棄する）。
 // 「編集前の値」はDB側で保持していないため、backendが都度実ファイルを読み直して復元し、
@@ -572,7 +549,7 @@ async function handleRevertChecked() {
       study.modality = reverted.modality
     }
   } catch (e) {
-    alert(e instanceof Error ? e.message : 'DICOMタグへの復元に失敗しました')
+    toast.error(e instanceof Error ? e.message : 'DICOMタグへの復元に失敗しました')
   } finally {
     reverting.value = false
   }
@@ -583,7 +560,7 @@ async function handleDeleteChecked() {
   try {
     await Promise.all(ids.map((id) => deleteStudy(id)))
   } catch (e) {
-    alert(e instanceof Error ? e.message : '削除に失敗しました')
+    toast.error(e instanceof Error ? e.message : '削除に失敗しました')
   } finally {
     checkable.clear()
     emit('data-changed')

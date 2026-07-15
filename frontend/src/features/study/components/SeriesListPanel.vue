@@ -18,18 +18,23 @@
       <span class="reorder-actions">
         <button
           class="reorder-btn"
-          :disabled="!authStore.isAdmin || reorder.saving.value"
-          :title="authStore.isAdmin ? '現在の並び順をDBに保存します' : '管理者のみ保存できます'"
-          @click="handleSaveOrder"
+          :disabled="!editable.dirty.value || editable.saving.value"
+          title="変更した内容をDBに保存します"
+          @click="handleSave"
         >
           💾 保存
         </button>
-        <button class="reorder-btn" :disabled="reorder.saving.value" @click="reorder.apply()">
-          ↺ 適用
+        <button
+          class="reorder-btn"
+          :disabled="!editable.dirty.value || editable.saving.value"
+          @click="editable.apply()"
+        >
+          ↺ 元に戻す
         </button>
-        <span v-if="reorder.dirty.value" class="dirty-hint">未保存</span>
-        <span v-if="reorder.saveError.value" class="reorder-error">
-          {{ reorder.saveError.value }}
+        <span v-if="editable.dirty.value" class="dirty-hint">未保存</span>
+        <span v-if="!authStore.isAdmin" class="dirty-hint">※並べ替えは管理者のみ</span>
+        <span v-if="editable.saveError.value" class="reorder-error">
+          {{ editable.saveError.value }}
         </span>
       </span>
       <span v-if="checkable.checkedIds.value.size > 0" class="checked-actions">
@@ -56,7 +61,7 @@
         </thead>
         <tbody>
           <tr
-            v-for="(series, index) in reorder.workingItems.value"
+            v-for="(series, index) in editable.workingItems.value"
             :key="series.seriesInstanceUID"
             class="series-row"
             :class="{
@@ -80,34 +85,18 @@
             <td>
               <input
                 v-if="checkable.isChecked(series)"
+                v-model="series.seriesNumber"
                 class="cell-input"
-                :value="series.seriesNumber"
                 @click.stop
-                @blur="
-                  saveField(
-                    series,
-                    $event,
-                    (v) => ({ seriesNumber: v }),
-                    (v) => (series.seriesNumber = v)
-                  )
-                "
               />
               <template v-else>{{ series.seriesNumber || '—' }}</template>
             </td>
             <td>
               <input
                 v-if="checkable.isChecked(series)"
+                v-model="series.modality"
                 class="cell-input"
-                :value="series.modality"
                 @click.stop
-                @blur="
-                  saveField(
-                    series,
-                    $event,
-                    (v) => ({ modality: v }),
-                    (v) => (series.modality = v)
-                  )
-                "
               />
               <template v-else>{{ series.modality || '—' }}</template>
             </td>
@@ -115,17 +104,9 @@
             <td>
               <input
                 v-if="checkable.isChecked(series)"
+                v-model="series.seriesDescription"
                 class="cell-input"
-                :value="series.seriesDescription"
                 @click.stop
-                @blur="
-                  saveField(
-                    series,
-                    $event,
-                    (v) => ({ seriesDescription: v }),
-                    (v) => (series.seriesDescription = v)
-                  )
-                "
               />
               <template v-else>{{ series.seriesDescription || '説明なし' }}</template>
             </td>
@@ -168,16 +149,16 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { renderDicomToCanvas } from '@/services/dicomService'
 import { useAuthStore } from '@/stores/authStore'
+import { useToast } from '@/composables/useToast'
 import { useDragSort } from '@/composables/useDragSort'
-import { useReorderable } from '@/composables/useReorderable'
+import { useEditableList } from '@/composables/useEditableList'
 import { useCheckableRows } from '@/composables/useCheckableRows'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import {
-  reorderSeries,
-  updateSeriesFields,
+  saveSeriesChanges,
   revertSeriesFields,
   deleteSeries,
-  type SeriesFieldsInput,
+  type SeriesChangeInput,
 } from '@/services/backendApiService'
 import SopListPanel from './SopListPanel.vue'
 import type { DicomStudy, DicomSeries } from '@/types/dicom'
@@ -192,19 +173,34 @@ const emit = defineEmits<{
 }>()
 
 const authStore = useAuthStore()
+const toast = useToast()
 const studySeries = computed(() => props.study.series)
-const reorder = useReorderable(
-  studySeries,
-  (s: DicomSeries) => s.seriesInstanceUID,
-  (s: DicomSeries) => s.order
-)
-const { draggingIndex, dragHandlers } = useDragSort(reorder.workingItems)
+const editable = useEditableList(studySeries, {
+  getId: (s: DicomSeries) => s.seriesInstanceUID,
+  getOrder: (s: DicomSeries) => s.order,
+  getFields: (s: DicomSeries) => ({
+    seriesNumber: s.seriesNumber,
+    seriesDescription: s.seriesDescription,
+    modality: s.modality,
+  }),
+})
+const { draggingIndex, dragHandlers } = useDragSort(editable.workingItems)
 
-async function handleSaveOrder() {
+async function handleSave() {
   try {
-    await reorder.save(reorderSeries)
-  } catch {
-    // reorder.saveError が画面に表示されるため、ここでは追加のハンドリング不要。
+    const count = await editable.save(
+      (series, patch): SeriesChangeInput => ({
+        seriesInstanceUid: series.seriesInstanceUID,
+        order: patch.order,
+        seriesNumber: patch.fields?.seriesNumber,
+        seriesDescription: patch.fields?.seriesDescription,
+        modality: patch.fields?.modality,
+      }),
+      saveSeriesChanges
+    )
+    if (count > 0) toast.success(`${count}件の変更を保存しました`)
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : '保存に失敗しました')
   }
 }
 
@@ -257,21 +253,6 @@ const checkable = useCheckableRows<DicomSeries>((s) => s.seriesInstanceUID)
 const showDeleteConfirm = ref(false)
 const reverting = ref(false)
 
-async function saveField(
-  series: DicomSeries,
-  event: Event,
-  toMutationInput: (value: string) => SeriesFieldsInput,
-  applyLocal: (value: string) => void
-) {
-  const value = (event.target as HTMLInputElement).value
-  try {
-    await updateSeriesFields(series.seriesInstanceUID, toMutationInput(value))
-    applyLocal(value)
-  } catch (e) {
-    alert(e instanceof Error ? e.message : '保存に失敗しました')
-  }
-}
-
 // チェックしたシリーズを、実際のDICOMファイルのタグ値に戻す（インライン編集で上書きした値を破棄する）。
 async function handleRevertChecked() {
   const ids = [...checkable.checkedIds.value]
@@ -286,7 +267,7 @@ async function handleRevertChecked() {
       series.modality = reverted.modality
     }
   } catch (e) {
-    alert(e instanceof Error ? e.message : 'DICOMタグへの復元に失敗しました')
+    toast.error(e instanceof Error ? e.message : 'DICOMタグへの復元に失敗しました')
   } finally {
     reverting.value = false
   }
@@ -297,7 +278,7 @@ async function handleDeleteChecked() {
   try {
     await Promise.all(ids.map((id) => deleteSeries(id)))
   } catch (e) {
-    alert(e instanceof Error ? e.message : '削除に失敗しました')
+    toast.error(e instanceof Error ? e.message : '削除に失敗しました')
   } finally {
     checkable.clear()
     emit('data-changed')

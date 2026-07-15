@@ -93,8 +93,28 @@ builder.Services
             // トークンの有効期限切れを判定する際、サーバー間の時計のズレを許容する猶予（既定5分）を0にする。
             ClockSkew = TimeSpan.Zero,
         };
+        // ======================================================
+        // JWTをAuthorizationヘッダーではなくhttpOnly Cookieから読み取る
+        // ======================================================
+        // フロントエンドはもうJWTの値そのものを知らない（localStorageに保存しない）ため、
+        // Authorizationヘッダーを自分で組み立てて送ることができない。代わりにブラウザが
+        // Cookieを自動送信してくるので、ここでCookieの中身をトークンとして扱うよう教える。
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                if (context.Request.Cookies.TryGetValue(AppConstants.AuthCookieName, out var token))
+                {
+                    context.Token = token;
+                }
+                return Task.CompletedTask;
+            },
+        };
     });
 builder.Services.AddAuthorization();
+
+// Mutation側でHttpContext（Cookieの設定・削除、ログイン中ユーザーの判定）にアクセスするために必要。
+builder.Services.AddHttpContextAccessor();
 
 // ======================================================
 // CORS設定（フロントエンドからのクロスオリジン通信を許可する）
@@ -109,7 +129,12 @@ builder.Services.AddCors(options =>
     options.AddPolicy(AppConstants.FrontendCorsPolicy, policy =>
         policy.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
-            .AllowAnyMethod());
+            .AllowAnyMethod()
+            // 認証をhttpOnly Cookieに変更したため、ブラウザにCookieを一緒に送らせる／
+            // 受け取ったSet-CookieをJSに見せる（CORSの credentials モード）には
+            // 明示的な許可が必要。ワイルドカードオリジン（*）とは併用できない仕様のため、
+            // WithOrigins()で許可オリジンを個別指定していることが前提になる。
+            .AllowCredentials());
 });
 
 // ======================================================

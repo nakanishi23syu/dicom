@@ -27,7 +27,13 @@
     例: URL が "/" なら StudyListView.vue がここに表示される。
   -->
   <RouterView />
+  <!-- どのページからでも useToast() 経由でここに通知が積まれる（App.vueに1箇所だけ配置） -->
+  <ToastContainer />
 </template>
+
+<script setup lang="ts">
+import ToastContainer from '@/components/common/ToastContainer.vue'
+</script>
 
 <!--
   グローバルスタイル（scoped なし）

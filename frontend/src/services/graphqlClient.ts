@@ -12,7 +12,6 @@
 // 呼び出すための共通処理をここに1つだけ用意し、各serviceはこれを土台にする。
 
 import { GRAPHQL_ENDPOINT } from '@/constants/env'
-import { AUTH_TOKEN_STORAGE_KEY } from '@/constants/auth'
 
 // GraphQLのレスポンスは常にこの形（{ data, errors }）で返ってくる。
 // REST と違い、HTTPステータスが200でも `errors` にエラー内容が入っていることがある点に注意。
@@ -45,18 +44,14 @@ export async function graphqlRequest<T>(
 ): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
 
-  // ログイン済みならAuthorizationヘッダーにJWTを付ける。
-  // このファイルはVueコンポーネントに依存しない層なので、Piniaストア(authStore)を
-  // 参照する代わりに、ストアと同じlocalStorageキーを直接読む
-  // （authStore.ts側もログイン/ログアウト時にこのキーを読み書きする）。
-  const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY)
-  if (token) {
-    headers.Authorization = `Bearer ${token}`
-  }
-
+  // JWTはbackendがhttpOnly Cookieとして発行するため、フロントエンドはトークンの値を
+  // 一切扱わない（localStorage等どこにも保存しない。stores/authStore.ts参照）。
+  // 代わりに credentials: 'include' でCookieをブラウザに自動送信させる
+  // （backend側もCORSでAllowCredentials()を設定済み。Program.cs参照）。
   const res = await fetch(GRAPHQL_ENDPOINT, {
     method: 'POST',
     headers,
+    credentials: 'include',
     body: JSON.stringify({ query, variables }),
   })
 

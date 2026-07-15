@@ -1,6 +1,7 @@
 using DicomLearning.GraphQL.Data;
 using DicomLearning.GraphQL.Models;
 using HotChocolate;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace DicomLearning.GraphQL.GraphQL;
@@ -66,4 +67,25 @@ public class Query
         await db.UserSops
             .Where(sop => !sop.IsRead)
             .ToListAsync();
+
+    // ======================================================
+    // ログイン状態の復元（httpOnly Cookie方式への変更に伴い追加）
+    // ======================================================
+    // 以前はJWTをlocalStorageに保存していたため、フロントエンドはページ再読み込み後も
+    // localStorageの値を読むだけでログイン状態（表示名・管理者フラグ）を復元できていた。
+    // httpOnly CookieはJavaScriptから値を読めない設計のため、その代わりに
+    // 「Cookieを送った状態でこのクエリを呼び、サーバー側でJWTを検証して結果を返す」
+    // 方式でログイン状態を復元する（frontend: stores/authStore.ts の restoreSession）。
+    // 未ログイン（Cookieが無い/無効）ならnullを返すだけで、[Authorize]は付けない。
+    public MeResult? GetMe([Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var user = httpContextAccessor.HttpContext?.User;
+        if (user?.Identity?.IsAuthenticated != true) return null;
+
+        return new MeResult
+        {
+            DisplayName = user.FindFirst("displayName")?.Value ?? "",
+            IsAdmin = user.IsInRole("Admin"),
+        };
+    }
 }
